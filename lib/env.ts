@@ -1,0 +1,25 @@
+function required(name: string, value: string | undefined) {
+  if (!value || value.trim().length === 0) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+
+  return value;
+}
+
+const NEXT_PUBLIC_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const NEXT_PUBLIC_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+export const env = {
+  geminiApiKey: () => required("GEMINI_API_KEY", process.env.GEMINI_API_KEY),
+  geminiModel: () => process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash",
+  supabaseUrl: () =>
+    NEXT_PUBLIC_SUPABASE_URL ?? required("SUPABASE_URL", process.env.SUPABASE_URL),
+  supabaseAnonKey: () =>
+    NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    required("SUPABASE_ANON_KEY", process.env.SUPABASE_ANON_KEY),
+  stripeSecretKey: () => required("STRIPE_SECRET_KEY", process.env.STRIPE_SECRET_KEY),
+  stripeWebhookSecret: () =>
+    required("STRIPE_WEBHOOK_SECRET", process.env.STRIPE_WEBHOOK_SECRET),
+  appUrl: () => process.env.NEXT_PUBLIC_APP_URL,
+  supabaseServiceRoleKey: () => process.env.SUPABASE_SERVICE_ROLE_KEY,
+};
