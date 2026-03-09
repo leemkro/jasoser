@@ -49,7 +49,7 @@ export async function POST(request: Request) {
 
       const usageQuery = await supabase
         .from("daily_usage")
-        .select("id, used_count, limit_count")
+        .select("id, used_count")
         .eq("user_id", user.id)
         .eq("feature", "generation")
         .eq("usage_date", today())
@@ -73,20 +73,16 @@ export async function POST(request: Request) {
             used_count: 1,
             limit_count: DAILY_LIMIT,
           })
-          .select("used_count, limit_count")
+          .select("used_count")
           .single();
 
         if (insertResult.error || !insertResult.data) {
           usageTrackingUnavailable = true;
         } else {
-          remaining = Math.max(
-            0,
-            (insertResult.data.limit_count ?? DAILY_LIMIT) -
-              (insertResult.data.used_count ?? 0),
-          );
+          remaining = Math.max(0, DAILY_LIMIT - (insertResult.data.used_count ?? 0));
         }
       } else if (!usageTrackingUnavailable && usageRow) {
-        if ((usageRow.used_count ?? 0) >= (usageRow.limit_count ?? DAILY_LIMIT)) {
+        if ((usageRow.used_count ?? 0) >= DAILY_LIMIT) {
           return NextResponse.json(
             { error: "오늘 무료 생성 횟수를 모두 사용했습니다." },
             { status: 429 },
@@ -97,17 +93,13 @@ export async function POST(request: Request) {
           .from("daily_usage")
           .update({ used_count: (usageRow.used_count ?? 0) + 1 })
           .eq("id", usageRow.id)
-          .select("used_count, limit_count")
+          .select("used_count")
           .single();
 
         if (updateResult.error || !updateResult.data) {
           usageTrackingUnavailable = true;
         } else {
-          remaining = Math.max(
-            0,
-            (updateResult.data.limit_count ?? DAILY_LIMIT) -
-              (updateResult.data.used_count ?? 0),
-          );
+          remaining = Math.max(0, DAILY_LIMIT - (updateResult.data.used_count ?? 0));
         }
       }
     }

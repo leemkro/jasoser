@@ -28,7 +28,7 @@ export function useSupabase(userId?: string | null) {
       const today = getTodayKey();
       const { data, error } = await supabase
         .from("daily_usage")
-        .select("used_count, limit_count")
+        .select("used_count")
         .eq("user_id", userId)
         .eq("usage_date", today)
         .eq("feature", "generation")
@@ -46,7 +46,7 @@ export function useSupabase(userId?: string | null) {
         return FREE_DAILY_LIMIT;
       }
 
-      return Math.max(0, (data.limit_count ?? FREE_DAILY_LIMIT) - (data.used_count ?? 0));
+      return Math.max(0, FREE_DAILY_LIMIT - (data.used_count ?? 0));
     } finally {
       setLoading(false);
     }
