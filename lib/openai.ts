@@ -179,7 +179,7 @@ const openAiResponseFormat = {
         },
         overallTip: { type: "string" },
       },
-      required: ["title", "sections"],
+      required: ["title", "sections", "overallTip"],
     },
   },
 } as const;
