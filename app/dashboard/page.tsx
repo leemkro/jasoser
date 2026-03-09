@@ -65,7 +65,9 @@ export default async function DashboardPage() {
                     {row.company} - {row.role}
                   </p>
                   <p className="text-xs text-zinc-500">
-                    {new Date(row.created_at).toLocaleString("ko-KR")}
+                    {new Date(row.created_at).toLocaleString("ko-KR", {
+                      timeZone: "Asia/Seoul",
+                    })}
                   </p>
                 </div>
                 <p className="mt-1 text-sm text-zinc-600">톤: {row.tone}</p>

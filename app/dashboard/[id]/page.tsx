@@ -44,7 +44,10 @@ export default async function DashboardDetailPage({ params }: PageProps) {
             {data.company} - {data.role}
           </h1>
           <p className="text-sm text-zinc-500">
-            {new Date(data.created_at).toLocaleString("ko-KR")} · 톤: {data.tone}
+            {new Date(data.created_at).toLocaleString("ko-KR", {
+              timeZone: "Asia/Seoul",
+            })}{" "}
+            · 톤: {data.tone}
           </p>
         </div>
         <Button asChild variant="outline" size="sm">
