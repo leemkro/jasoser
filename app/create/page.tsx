@@ -33,19 +33,21 @@ type FormValues = z.infer<typeof formSchema>;
 export default function CreatePage() {
   const { user, isPremium, loading: userLoading } = useUser();
   const usage = useSupabase(user?.id);
+  const userId = user?.id;
+  const { getLocalRemainingCount, getRemainingCount } = usage;
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<GeneratedEssay | null>(null);
   const [naturalMode, setNaturalMode] = useState(false);
   const [remaining, setRemaining] = useState<number | null>(() => {
     if (typeof window === "undefined") return null;
-    return usage.getLocalRemainingCount();
+    return getLocalRemainingCount();
   });
 
   useEffect(() => {
-    if (!user || isPremium) return;
-    setRemaining(usage.getLocalRemainingCount());
-    usage.getRemainingCount().then(setRemaining);
-  }, [user, isPremium, usage]);
+    if (!userId || isPremium) return;
+    setRemaining(getLocalRemainingCount());
+    getRemainingCount().then(setRemaining);
+  }, [userId, isPremium, getLocalRemainingCount, getRemainingCount]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),

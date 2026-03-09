@@ -81,12 +81,21 @@ export function useSupabase(userId?: string | null) {
     return Math.max(0, FREE_DAILY_LIMIT - localUsed);
   }, [userId]);
 
-  return {
-    loading,
-    freeDailyLimit: FREE_DAILY_LIMIT,
-    getRemainingCount,
-    getLocalRemainingCount,
-    incrementLocalFallback,
-    syncLocalFromRemaining,
-  };
+  return useMemo(
+    () => ({
+      loading,
+      freeDailyLimit: FREE_DAILY_LIMIT,
+      getRemainingCount,
+      getLocalRemainingCount,
+      incrementLocalFallback,
+      syncLocalFromRemaining,
+    }),
+    [
+      loading,
+      getRemainingCount,
+      getLocalRemainingCount,
+      incrementLocalFallback,
+      syncLocalFromRemaining,
+    ],
+  );
 }
