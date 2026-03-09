@@ -20,7 +20,7 @@ export function useSupabase(userId?: string | null) {
 
   const getRemainingCount = useCallback(async () => {
     if (!userId) {
-      return 0;
+      return FREE_DAILY_LIMIT;
     }
 
     setLoading(true);
@@ -32,12 +32,14 @@ export function useSupabase(userId?: string | null) {
         .eq("user_id", userId)
         .eq("usage_date", today)
         .eq("feature", "generation")
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) {
-        const localRaw = localStorage.getItem(getLocalUsageKey(userId));
-        const localUsed = localRaw ? Number(localRaw) : 0;
-        return Math.max(0, FREE_DAILY_LIMIT - localUsed);
+        // Query failure should not hard-block the user at 0.
+        // Server-side /api/generate is the source of truth for quota enforcement.
+        return FREE_DAILY_LIMIT;
       }
 
       if (!data) {
@@ -73,7 +75,7 @@ export function useSupabase(userId?: string | null) {
   );
 
   const getLocalRemainingCount = useCallback(() => {
-    if (!userId) return 0;
+    if (!userId) return FREE_DAILY_LIMIT;
     const localRaw = localStorage.getItem(getLocalUsageKey(userId));
     const localUsed = localRaw ? Number(localRaw) : 0;
     return Math.max(0, FREE_DAILY_LIMIT - localUsed);
