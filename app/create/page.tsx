@@ -121,9 +121,28 @@ export default function CreatePage() {
   }
 
   async function regenerateNatural() {
+    if (!isPremium && remaining !== null && remaining <= 0) {
+      toast.error("무료 생성 횟수를 모두 사용했습니다. 프리미엄을 이용해 주세요.");
+      return;
+    }
+
+    if (!isPremium) {
+      const remainingCount = await usage.getRemainingCount();
+      setRemaining(remainingCount);
+
+      if (remainingCount <= 0) {
+        usage.syncLocalFromRemaining(remainingCount);
+        toast.error("무료 생성 횟수를 모두 사용했습니다. 프리미엄을 이용해 주세요.");
+        return;
+      }
+    }
+
     setNaturalMode(true);
-    await form.handleSubmit(submit)();
-    setNaturalMode(false);
+    try {
+      await form.handleSubmit(submit)();
+    } finally {
+      setNaturalMode(false);
+    }
   }
 
   if (userLoading) {
