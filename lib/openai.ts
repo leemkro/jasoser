@@ -1,18 +1,6 @@
 import { z } from "zod";
 
-import { env } from "@/lib/env";
 import type { GeneratedEssay, GenerationInput } from "@/lib/types";
-
-interface GeminiErrorPayload {
-  error?: {
-    code?: number;
-    message?: string;
-    details?: Array<{
-      "@type"?: string;
-      retryDelay?: string;
-    }>;
-  };
-}
 
 const responseSchema = z.object({
   title: z.string(),
@@ -57,83 +45,96 @@ JSON 스키마:
 }
 
 export async function generateEssay(input: GenerationInput): Promise<GeneratedEssay> {
-  const model = env.geminiModel();
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
-      env.geminiApiKey(),
-    )}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [
-            {
-              text: "항상 엄격하게 JSON만 반환하는 한국어 자소서 생성기. 친절한 설명 문구를 JSON 밖에 절대 출력하지 마라.",
-            },
-          ],
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: buildPrompt(input) }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.85,
-          responseMimeType: "application/json",
-        },
-      }),
-    },
-  );
+  const maxRetries = 3;
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    let payload: GeminiErrorPayload | null = null;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 55000);
 
     try {
-      payload = JSON.parse(errorText) as GeminiErrorPayload;
-    } catch {
-      payload = null;
+      const response = await fetch("https://text.pollinations.ai/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "openai",
+          messages: [
+            {
+              role: "system",
+              content: "항상 엄격하게 JSON만 반환하는 한국어 자소서 생성기. 친절한 설명 문구를 JSON 밖에 절대 출력하지 마라.",
+            },
+            { role: "user", content: buildPrompt(input) },
+          ],
+          temperature: 0.85,
+          jsonMode: true,
+          seed: Math.floor(Math.random() * 1000000),
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        console.error(`Pollinations API error (attempt ${attempt + 1}):`, response.status);
+        if (attempt < maxRetries - 1) continue;
+        throw new Error(`AI API 호출 실패(${response.status})`);
+      }
+
+      const rawText = await response.text();
+      if (!rawText || rawText.trim().length === 0) {
+        console.error(`Empty response (attempt ${attempt + 1})`);
+        if (attempt < maxRetries - 1) continue;
+        throw new Error("AI 응답이 비어 있습니다.");
+      }
+
+      let content = rawText.trim();
+
+      // If response is a message wrapper, extract the content field
+      try {
+        const wrapper = JSON.parse(content) as { role?: string; content?: string };
+        if (wrapper.role === "assistant" && typeof wrapper.content === "string") {
+          content = wrapper.content.trim();
+        }
+      } catch {
+        // Not a JSON wrapper, continue processing
+      }
+
+      // Clean up
+      content = content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+      content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        content = jsonMatch[0];
+      }
+
+      // Fix common JSON issues
+      content = content
+        .replace(/,\s*\.\.\.\s*(?=[\]}])/g, "")
+        .replace(/\.\.\.\s*(?=[\]}])/g, "")
+        .replace(/\/\/.*/g, "")
+        .replace(/,\s*([\]}])/g, "$1")
+        .replace(/[\x00-\x1F\x7F]/g, (ch) => ch === "\n" || ch === "\r" || ch === "\t" ? ch : "");
+
+      const parsed = responseSchema.safeParse(JSON.parse(content));
+      if (!parsed.success) {
+        console.error(`Attempt ${attempt + 1}: Invalid response schema`);
+        if (attempt < maxRetries - 1) continue;
+        throw new Error("AI 응답 형식이 올바르지 않습니다.");
+      }
+
+      return parsed.data;
+    } catch (err) {
+      clearTimeout(timeout);
+
+      if (err instanceof DOMException && err.name === "AbortError") {
+        if (attempt < maxRetries - 1) continue;
+        throw new Error("요청 시간이 초과되었습니다.");
+      }
+
+      if (attempt === maxRetries - 1) throw err;
+      console.error(`Attempt ${attempt + 1} error:`, err instanceof Error ? err.message : String(err));
     }
-
-    if (response.status === 429) {
-      const retryInfo = payload?.error?.details?.find(
-        (detail) => detail["@type"] === "type.googleapis.com/google.rpc.RetryInfo",
-      );
-      const retryDelay = retryInfo?.retryDelay;
-      const retryHint = retryDelay ? ` 약 ${retryDelay} 후 다시 시도해 주세요.` : "";
-
-      throw new Error(
-        `Gemini API 할당량(Quota)을 초과했습니다. Google AI Studio에서 결제/요금제와 사용량을 확인해 주세요.${retryHint}`,
-      );
-    }
-
-    const message = payload?.error?.message;
-    throw new Error(
-      message
-        ? `Gemini API 호출 실패(${response.status}): ${message}`
-        : `Gemini API 호출 실패(${response.status})`,
-    );
   }
 
-  const json = (await response.json()) as {
-    candidates?: Array<{
-      content?: { parts?: Array<{ text?: string }> };
-    }>;
-  };
-
-  const raw = json.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!raw) {
-    throw new Error("AI 응답이 비어 있습니다.");
-  }
-
-  const parsed = responseSchema.safeParse(JSON.parse(raw));
-  if (!parsed.success) {
-    throw new Error("AI 응답 형식이 올바르지 않습니다.");
-  }
-
-  return parsed.data;
+  throw new Error("AI 응답 생성에 실패했습니다. 다시 시도해주세요.");
 }

@@ -72,10 +72,18 @@ export function useSupabase(userId?: string | null) {
     [userId],
   );
 
+  const getLocalRemainingCount = useCallback(() => {
+    if (!userId) return 0;
+    const localRaw = localStorage.getItem(getLocalUsageKey(userId));
+    const localUsed = localRaw ? Number(localRaw) : 0;
+    return Math.max(0, FREE_DAILY_LIMIT - localUsed);
+  }, [userId]);
+
   return {
     loading,
     freeDailyLimit: FREE_DAILY_LIMIT,
     getRemainingCount,
+    getLocalRemainingCount,
     incrementLocalFallback,
     syncLocalFromRemaining,
   };

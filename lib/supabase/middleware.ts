@@ -38,5 +38,12 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // 로그인 상태에서 홈(/) 접근 시 /create로 리다이렉트
+  if (request.nextUrl.pathname === "/" && user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/create";
+    return NextResponse.redirect(url);
+  }
+
   return response;
 }

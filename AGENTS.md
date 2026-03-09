@@ -4,166 +4,171 @@ Operational guide for coding agents working in `C:\toyworkspace\jasoser`.
 
 ## 1) Repository Snapshot
 
-- Stack: Next.js 15 App Router + React 19 + TypeScript + Tailwind CSS v4.
-- Data/Auth: Supabase (`@supabase/ssr`, `@supabase/supabase-js`).
-- Billing: Stripe (`stripe`, `@stripe/stripe-js`).
-- AI generation: Gemini API (server-side via `fetch`).
-- UI primitives: shadcn-style components in `components/ui` (Radix + CVA).
-- Package manager in use: `npm` (lockfile present).
+- **Stack**: Next.js 15 App Router + React 19 + TypeScript + Tailwind CSS v4 (via `@tailwindcss/postcss`).
+- **Data/Auth**: Supabase (`@supabase/ssr`, `@supabase/supabase-js`). Google OAuth + email/password.
+- **Payments**: Stripe (`stripe`, `@stripe/stripe-js`) **and** Toss Payments (`@tosspayments/tosspayments-sdk`).
+- **AI generation**: Pollinations API (server-side `fetch` to `https://text.pollinations.ai/`). No API key required. See `lib/openai.ts`.
+- **Forms**: `react-hook-form` + `@hookform/resolvers` + `zod`.
+- **Data fetching**: Server components use Supabase directly; client components use `swr` or `fetch`.
+- **UI primitives**: shadcn-style in `components/ui/` (Radix + CVA + `cn()` utility).
+- **Icons**: `lucide-react`.
+- **Toasts**: `sonner`.
+- **Package manager**: `npm` (lockfile present).
 
 ## 2) Rule Files Check
 
-Checked for higher-priority instruction files:
-
-- `.cursor/rules/**`
-- `.cursorrules`
-- `.github/copilot-instructions.md`
-
-None are present right now.
-
-If these files are added later, treat them as higher priority than this file.
+No `.cursor/rules/**`, `.cursorrules`, or `.github/copilot-instructions.md` files are present.
+If added later, treat them as higher priority than this file.
 
 ## 3) Command Matrix
 
-Run all commands from repo root: `C:\toyworkspace\jasoser`.
+Run all commands from repo root.
 
-### Core scripts
+| Action    | Command          | Notes                                          |
+|-----------|------------------|-------------------------------------------------|
+| Dev       | `npm run dev`    | Starts Next.js dev server                       |
+| Build     | `npm run build`  | **Best full-project verification** (types + lint)|
+| Start     | `npm run start`  | Production server                               |
+| Lint      | `npm run lint`   | Runs `eslint .`                                 |
 
-- Dev: `npm run dev`
-- Build: `npm run build`
-- Start: `npm run start`
-- Lint: `npm run lint`
+- No `typecheck` script; use `npm run build` as type-check source of truth.
+- Build requires env vars (see section 6).
 
-### Verified status
+## 4) Test Commands
 
-- `npm run lint` works (runs `eslint .`).
-- `npm run build` works and is the best full-project verification command.
-- Build depends on required env vars (see Environment section).
+- No test runner, config, or test files exist.
+- Do not invent test commands. Update this file if tests are added.
 
-### Typecheck guidance
+## 5) Verification Flow
 
-- No dedicated `typecheck` script exists.
-- Use `npm run build` as source-of-truth type validation.
-- Avoid treating raw `npx tsc --noEmit` as source-of-truth in this repo.
-
-## 4) Test Commands (Current Reality)
-
-- There is no `test` script in `package.json`.
-- No test runner config is present (Jest/Vitest/Playwright/Cypress/etc.).
-- No `*.test.*` / `*.spec.*` files exist.
-
-Implications:
-
-- No repo-native full test command exists today.
-- No single-test command exists today.
-- Do not invent test commands in docs or automation.
-
-If tests are added later, update this file with:
-
-- full suite command
-- single file command
-- single test name command
-- watch command
-
-## 5) Recommended Verification Flow
-
-Use this order after code changes:
+After code changes, run in order:
 
 1. `npm run lint`
 2. `npm run build`
 
-If a command fails due to missing env/config, report that clearly.
+Report failures clearly, especially if caused by missing env/config.
 
-## 6) Environment Requirements
+## 6) Environment Variables
 
-Required for normal app behavior:
+All env access goes through `lib/env.ts` (lazy getters with `required()` guard). Always use `env.*()` instead of raw `process.env`.
 
-- `GEMINI_API_KEY`
-- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
+**Required**:
+- `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_ANON_KEY`
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+- `NEXT_PUBLIC_TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`
 
-Common optional/supporting values:
+**Optional**:
+- `NEXT_PUBLIC_APP_URL` (defaults to request origin)
+- `SUPABASE_SERVICE_ROLE_KEY` (admin operations, webhooks)
 
-- `GEMINI_MODEL` (default in code: `gemini-1.5-flash`)
-- `NEXT_PUBLIC_APP_URL`
-- `SUPABASE_SERVICE_ROLE_KEY` (webhook/admin sync path)
+**Note**: `.env.example` contains `GEMINI_API_KEY` and `GEMINI_MODEL` but these are **unused** — the AI provider was migrated to Pollinations (no key needed).
 
-Reference template: `.env.example`.
+## 7) Project Structure
 
-## 7) Project Structure Conventions
-
-- App routes: `app/**/page.tsx`
-- API routes: `app/api/**/route.ts`
-- Auth callback: `app/auth/callback/route.ts`
-- Shared server/client utilities: `lib/**`
-- Hooks: `hooks/**`
-- Reusable UI primitives: `components/ui/**`
-- Feature components: `components/**`
-- SQL schema and policies: `supabase/schema.sql`
-
-Keep this organization unless there is a strong reason to change it.
+```
+app/                      # Next.js App Router
+  api/                    # API routes (generate, stripe, toss, webhooks)
+  auth/callback/          # Supabase auth callback
+  (billing|create|dashboard|pricing|success)/  # Page routes
+  layout.tsx              # Root layout (server component, Korean locale)
+  globals.css             # Tailwind + CSS tokens + keyframes
+components/               # Feature components (auth-panel, generation-result, etc.)
+  ui/                     # Reusable UI primitives (button, card, input, etc.)
+hooks/                    # Client hooks (use-user, use-supabase)
+lib/                      # Shared utilities
+  env.ts                  # Centralized env access (ALWAYS use this)
+  openai.ts               # AI generation (Pollinations API)
+  stripe.ts               # Stripe client singleton
+  toss.ts                 # Toss Payments API helpers
+  types.ts                # Shared domain types
+  utils.ts                # cn() utility
+  supabase/               # Supabase clients (server, browser, admin, middleware)
+types/                    # Type declarations for untyped packages
+supabase/schema.sql       # DB schema + RLS policies
+check-usage.mjs           # Dev utility script for inspecting user usage
+```
 
 ## 8) Import and Module Style
 
-- Use ES module imports/exports.
-- Use double quotes and semicolons.
-- Prefer `import type` for type-only imports.
-- Keep one blank line between external imports and internal `@/*` imports.
-- Use `@/*` alias for internal paths (configured in `tsconfig.json`).
+- ES module imports/exports.
+- Double quotes, semicolons.
+- `import type` for type-only imports.
+- One blank line between external imports and internal `@/*` imports.
+- Use `@/*` path alias (configured in `tsconfig.json`).
 - Remove unused imports.
 
-## 9) Formatting Style
+```typescript
+// External imports first
+import { NextResponse } from "next/server";
+import { z } from "zod";
 
-- Use 2-space indentation.
-- Keep JSX readable; split long props across lines.
-- Keep blank lines purposeful, not dense.
-- Do not align with manual spacing.
-- No Prettier config exists; follow current file formatting patterns.
+// Then internal imports after blank line
+import { generateEssay } from "@/lib/openai";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+```
 
-## 10) TypeScript Rules
+## 9) Component Patterns
 
-- `strict: true` is enabled; maintain strict typing.
-- Avoid `any`, `@ts-ignore`, `@ts-expect-error`.
-- Validate external input with Zod at boundaries.
-- Use explicit interfaces/types for shared data contracts.
-- Keep config objects typed where appropriate (`Metadata`, `NextConfig`, etc.).
+- **Server components** (default): Pages like `layout.tsx`, `dashboard/page.tsx`. Use `async function` + `await` Supabase calls.
+- **Client components**: Start with `"use client"` directive. Use hooks, browser APIs, event handlers.
+- **Conditional rendering**: Use ternary `{condition ? <X /> : null}`, not `{condition && <X />}`.
+- **Form handling**: `react-hook-form` + `zodResolver` pattern. See `create/page.tsx`.
+- **Supabase clients**: Server → `createSupabaseServerClient()`, Browser → `createSupabaseBrowserClient()`, Admin → `createSupabaseAdminClient()`.
+- **UI components**: `React.forwardRef` + CVA variants + `cn()` for className merging.
 
-## 11) Naming Rules
+## 10) Formatting Style
+
+- 2-space indentation.
+- Split long JSX props across lines.
+- Purposeful blank lines, not dense.
+- No Prettier config; follow existing file patterns.
+- No manual alignment spacing.
+
+## 11) TypeScript Rules
+
+- `strict: true` enabled; maintain strict typing.
+- **Never** use `any`, `@ts-ignore`, `@ts-expect-error`.
+- Validate external input with Zod at API boundaries (see `api/generate/route.ts`).
+- Use explicit interfaces/types for shared data contracts (see `lib/types.ts`).
+- Put module type declarations in `types/` directory.
+
+## 12) Naming Rules
 
 - React components: PascalCase (`CreatePage`, `GenerationResult`).
 - Variables/functions: camelCase.
-- Route file names: framework defaults (`page.tsx`, `layout.tsx`, `route.ts`).
+- Route files: framework defaults (`page.tsx`, `layout.tsx`, `route.ts`).
 - CSS custom properties: kebab-case.
-- Prefer clear domain names over short abbreviations.
+- Prefer clear domain names over abbreviations.
 
-## 12) Styling and UI Rules
+## 13) Styling and UI
 
-- Tailwind utility classes are the primary styling method.
-- Keep global CSS in `app/globals.css` minimal and token-focused.
-- Reuse existing UI primitives in `components/ui` before adding new ones.
-- Keep mobile responsiveness in layout/components by default.
-- Keep Korean UI copy user-facing and consistent with existing tone.
+- Tailwind utility classes as primary styling method.
+- Global CSS in `app/globals.css` — minimal, token-focused, with `@theme inline` blocks.
+- Reuse `components/ui/` primitives before creating new ones.
+- Mobile-responsive by default.
+- Korean UI copy, consistent tone (`lang="ko"`, dates with `ko-KR` locale).
 
-## 13) Error Handling Rules
+## 14) Error Handling
 
-- Prefer early returns and guard clauses.
-- For API routes: return structured `NextResponse.json` with proper status codes.
-- For client actions: show user-friendly errors via `sonner` toast.
-- Never swallow errors silently.
-- Throw clear errors for missing required env vars in central env helpers.
+- Early returns and guard clauses.
+- API routes: return `NextResponse.json({ error: "..." }, { status: N })`.
+- Client: show user-friendly Korean errors via `toast.error()` from sonner.
+- Never swallow errors silently (empty `catch {}` forbidden).
+- Use `lib/env.ts` `required()` helper for missing env vars.
 
-## 14) Security and Boundary Rules
+## 15) Security and Boundaries
 
-- Do not expose secret keys to client code.
-- Keep AI calls, Stripe secret operations, and privileged updates server-side.
-- Treat middleware as routing guard, not sole authorization layer.
-- Keep Supabase admin operations restricted to server-only paths.
+- Never expose secret keys to client code.
+- AI calls, Stripe/Toss secret operations → server-side only.
+- Middleware is routing guard, not sole authorization (always verify `auth.getUser()` in API routes).
+- Supabase admin client → server-only paths.
+- RLS enabled on all tables (see `supabase/schema.sql`).
 
-## 15) Practical Defaults for Agents
+## 16) Practical Defaults for Agents
 
 - Make minimal, surgical changes aligned with existing patterns.
-- Prefer updating existing helpers/components over introducing parallel patterns.
+- Prefer updating existing helpers/components over parallel patterns.
 - Keep API contracts stable when editing client/server integration.
-- After edits, run lint/build and report exact outcomes.
-- Update this file when command reality or architecture changes.
+- After edits, run `npm run lint` then `npm run build` and report outcomes.
+- Update this file when commands, architecture, or env vars change.

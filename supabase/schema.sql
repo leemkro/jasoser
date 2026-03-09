@@ -4,6 +4,10 @@ create table if not exists public.profiles (
   subscription_status text default 'free',
   stripe_customer_id text,
   stripe_subscription_id text,
+  billing_key text,
+  toss_customer_key text,
+  current_period_end timestamptz,
+  credits integer not null default 0,
   created_at timestamptz default now()
 );
 

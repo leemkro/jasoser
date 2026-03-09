@@ -59,7 +59,7 @@ export default async function DashboardPage() {
             <p className="text-sm text-zinc-500">아직 생성 기록이 없습니다.</p>
           ) : (
             history.map((row) => (
-              <div key={row.id} className="rounded-md border border-zinc-200 p-4">
+              <Link key={row.id} href={`/dashboard/${row.id}`} className="block rounded-md border border-zinc-200 p-4 transition-colors hover:border-zinc-400 hover:bg-zinc-50">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-medium text-zinc-900">
                     {row.company} - {row.role}
@@ -72,7 +72,7 @@ export default async function DashboardPage() {
                 <p className="mt-2 line-clamp-2 text-sm text-zinc-700">
                   {row.output?.sections?.[0]?.answer ?? "미리보기를 불러올 수 없습니다."}
                 </p>
-              </div>
+              </Link>
             ))
           )}
         </CardContent>

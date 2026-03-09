@@ -40,22 +40,25 @@ export default async function RootLayout({
         <div className="min-h-screen bg-zinc-50">
           <header className="border-b border-zinc-200 bg-white/80 backdrop-blur">
             <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-              <Link href="/" className="text-lg font-semibold text-zinc-900">
+              <Link href={user ? "/create" : "/"} className="text-lg font-semibold text-zinc-900">
                 자소서바이브
               </Link>
               <nav className="flex items-center gap-2 sm:gap-4">
-                <Link href="/create" className="text-sm text-zinc-600 hover:text-zinc-900">
-                  생성하기
-                </Link>
-                <Link
-                  href="/dashboard"
-                  className="text-sm text-zinc-600 hover:text-zinc-900"
-                >
-                  대시보드
-                </Link>
+                {user ? (
+                  <>
+                    <Link href="/create" className="text-sm text-zinc-600 hover:text-zinc-900">
+                      생성하기
+                    </Link>
+                    <Link href="/dashboard" className="text-sm text-zinc-600 hover:text-zinc-900">
+                      대시보드
+                    </Link>
+                  </>
+                ) : null}
+                {/* TODO: 요금제 링크 — 나중에 다시 활성화
                 <Link href="/pricing" className="text-sm text-zinc-600 hover:text-zinc-900">
                   요금제
                 </Link>
+                */}
                 {user ? <UserMenu email={user.email} /> : null}
               </nav>
             </div>

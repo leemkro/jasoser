@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useSupabase } from "@/hooks/use-supabase";
@@ -35,7 +36,16 @@ export default function CreatePage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<GeneratedEssay | null>(null);
   const [naturalMode, setNaturalMode] = useState(false);
-  const [remaining, setRemaining] = useState<number | null>(null);
+  const [remaining, setRemaining] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    return usage.getLocalRemainingCount();
+  });
+
+  useEffect(() => {
+    if (!user || isPremium) return;
+    setRemaining(usage.getLocalRemainingCount());
+    usage.getRemainingCount().then(setRemaining);
+  }, [user, isPremium, usage]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -65,14 +75,15 @@ export default function CreatePage() {
       return;
     }
 
+    setSubmitting(true);
+
     const remainingCount = await usage.getRemainingCount();
 
     if (!isPremium && remainingCount <= 0) {
       toast.error("무료 생성 횟수를 모두 사용했습니다. 프리미엄을 이용해 주세요.");
+      setSubmitting(false);
       return;
     }
-
-    setSubmitting(true);
     try {
       const response = await fetch("/api/generate", {
         method: "POST",
@@ -187,14 +198,20 @@ export default function CreatePage() {
             <p className="text-sm text-zinc-500">오늘 무료 남은 횟수: {remaining}</p>
           ) : null}
 
-          <Button
-            className="w-full"
-            onClick={form.handleSubmit(submit)}
-            disabled={submitting || isBlocked}
-          >
-            {submitting ? <Spinner /> : null}
-            자소서 초안 생성
-          </Button>
+          {submitting ? (
+            <div className="space-y-2">
+              <Progress />
+              <p className="text-center text-sm text-zinc-500">자소서를 생성하고 있습니다...</p>
+            </div>
+          ) : (
+            <Button
+              className="w-full"
+              onClick={form.handleSubmit(submit)}
+              disabled={isBlocked}
+            >
+              자소서 초안 생성
+            </Button>
+          )}
         </CardContent>
       </Card>
 

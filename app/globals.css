@@ -30,9 +30,22 @@
   }
 }
 
+@keyframes progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(200%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
 @theme inline {
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-progress: progress 1.5s ease-in-out infinite;
 }
 
 @media (prefers-color-scheme: dark) {
