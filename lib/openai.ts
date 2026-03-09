@@ -14,11 +14,50 @@ const responseSchema = z.object({
 });
 
 function getMinimumAnswerLength(characterLimit: number) {
-  return Math.max(220, Math.floor(characterLimit * 0.7));
+  return Math.max(220, Math.min(650, Math.floor(characterLimit * 0.55)));
 }
 
 function countChars(text: string) {
   return text.replace(/\s/g, "").length;
+}
+
+function normalizeResultShape(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object") {
+    return payload;
+  }
+
+  const obj = payload as Record<string, unknown>;
+  const rawSections = obj.sections ?? obj.items ?? obj.answers;
+
+  if (!Array.isArray(rawSections)) {
+    return payload;
+  }
+
+  const sections = rawSections
+    .map((item, index) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+      const section = item as Record<string, unknown>;
+      const question = section.question ?? section.title ?? section.heading ?? `문항 ${index + 1}`;
+      const answer = section.answer ?? section.content ?? section.text;
+
+      if (typeof question !== "string" || typeof answer !== "string") {
+        return null;
+      }
+
+      return {
+        question: question.trim(),
+        answer: answer.trim(),
+      };
+    })
+    .filter((item): item is { question: string; answer: string } => item !== null);
+
+  return {
+    title: typeof obj.title === "string" ? obj.title : "자기소개서 초안",
+    sections,
+    overallTip: typeof obj.overallTip === "string" ? obj.overallTip : undefined,
+  };
 }
 
 function buildPrompt(input: GenerationInput) {
@@ -56,7 +95,7 @@ JSON 스키마:
 }
 
 export async function generateEssay(input: GenerationInput): Promise<GeneratedEssay> {
-  const maxRetries = 3;
+  const maxRetries = 4;
   const minimumAnswerLength = getMinimumAnswerLength(input.characterLimit);
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -127,7 +166,9 @@ export async function generateEssay(input: GenerationInput): Promise<GeneratedEs
         .replace(/,\s*([\]}])/g, "$1")
         .replace(/[\x00-\x1F\x7F]/g, (ch) => ch === "\n" || ch === "\r" || ch === "\t" ? ch : "");
 
-      const parsed = responseSchema.safeParse(JSON.parse(content));
+      const parsedJson = JSON.parse(content);
+      const normalized = normalizeResultShape(parsedJson);
+      const parsed = responseSchema.safeParse(normalized);
       if (!parsed.success) {
         console.error(`Attempt ${attempt + 1}: Invalid response schema`);
         if (attempt < maxRetries - 1) continue;
