@@ -48,7 +48,18 @@ export function AuthPanel() {
       });
 
       if (error) {
+        const lower = error.message.toLowerCase();
+        if (lower.includes("already") && lower.includes("registered")) {
+          toast.error("이미 가입된 이메일입니다. 로그인해 주세요.");
+          return;
+        }
         toast.error(error.message);
+        return;
+      }
+
+      const hasIdentity = (data.user?.identities?.length ?? 0) > 0;
+      if (!data.session && data.user && !hasIdentity) {
+        toast.error("이미 가입된 이메일입니다. 로그인해 주세요.");
         return;
       }
 
