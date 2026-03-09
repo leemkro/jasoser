@@ -45,9 +45,9 @@ export async function POST(request: Request) {
     const premium = ["active", "trialing"].includes(profile?.subscription_status ?? "free");
 
     let remaining = null as number | null;
+    let usageTrackingUnavailable = false;
+    let usageRow: { id: string; used_count: number | null } | null = null;
     if (!premium) {
-      let usageTrackingUnavailable = false;
-
       const usageQuery = await supabase
         .from("daily_usage")
         .select("id, used_count")
@@ -62,46 +62,12 @@ export async function POST(request: Request) {
         usageTrackingUnavailable = true;
       }
 
-      const usageRow = usageQuery.data;
-
-      if (!usageTrackingUnavailable && !usageRow) {
-        const insertResult = await supabase
-          .from("daily_usage")
-          .insert({
-            user_id: user.id,
-            feature: "generation",
-            usage_date: today(),
-            used_count: 1,
-            limit_count: DAILY_LIMIT,
-          })
-          .select("used_count")
-          .single();
-
-        if (insertResult.error || !insertResult.data) {
-          usageTrackingUnavailable = true;
-        } else {
-          remaining = Math.max(0, DAILY_LIMIT - (insertResult.data.used_count ?? 0));
-        }
-      } else if (!usageTrackingUnavailable && usageRow) {
-        if ((usageRow.used_count ?? 0) >= DAILY_LIMIT) {
-          return NextResponse.json(
-            { error: "오늘 무료 생성 횟수를 모두 사용했습니다." },
-            { status: 429 },
-          );
-        }
-
-        const updateResult = await supabase
-          .from("daily_usage")
-          .update({ used_count: (usageRow.used_count ?? 0) + 1 })
-          .eq("id", usageRow.id)
-          .select("used_count")
-          .single();
-
-        if (updateResult.error || !updateResult.data) {
-          usageTrackingUnavailable = true;
-        } else {
-          remaining = Math.max(0, DAILY_LIMIT - (updateResult.data.used_count ?? 0));
-        }
+      usageRow = usageQuery.data;
+      if (!usageTrackingUnavailable && (usageRow?.used_count ?? 0) >= DAILY_LIMIT) {
+        return NextResponse.json(
+          { error: "오늘 무료 생성 횟수를 모두 사용했습니다." },
+          { status: 429 },
+        );
       }
     }
 
@@ -132,6 +98,41 @@ export async function POST(request: Request) {
           console.error("Failed to save generation history (admin client):", adminInsert.error);
         } else {
           historySaved = true;
+        }
+      }
+    }
+
+    if (!premium && !usageTrackingUnavailable) {
+      if (!usageRow) {
+        const insertResult = await supabase
+          .from("daily_usage")
+          .insert({
+            user_id: user.id,
+            feature: "generation",
+            usage_date: today(),
+            used_count: 1,
+            limit_count: DAILY_LIMIT,
+          })
+          .select("used_count")
+          .single();
+
+        if (!insertResult.error && insertResult.data) {
+          remaining = Math.max(0, DAILY_LIMIT - (insertResult.data.used_count ?? 0));
+        } else {
+          console.error("Failed to increment usage after generation (insert):", insertResult.error);
+        }
+      } else {
+        const updateResult = await supabase
+          .from("daily_usage")
+          .update({ used_count: (usageRow.used_count ?? 0) + 1 })
+          .eq("id", usageRow.id)
+          .select("used_count")
+          .single();
+
+        if (!updateResult.error && updateResult.data) {
+          remaining = Math.max(0, DAILY_LIMIT - (updateResult.data.used_count ?? 0));
+        } else {
+          console.error("Failed to increment usage after generation (update):", updateResult.error);
         }
       }
     }
