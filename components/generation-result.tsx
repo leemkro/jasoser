@@ -175,30 +175,45 @@ export function GenerationResult({
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <CardTitle>{result.title}</CardTitle>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={downloadPdf} disabled={downloading}>
+    <Card className="overflow-hidden">
+      <CardHeader className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+        <CardTitle className="text-lg leading-snug break-words sm:text-xl">{result.title}</CardTitle>
+        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:items-center">
+          <Button
+            size="sm"
+            className="w-full sm:w-auto"
+            variant="outline"
+            onClick={downloadPdf}
+            disabled={downloading}
+          >
             <Download className="h-4 w-4" /> PDF
           </Button>
-          <Button size="sm" variant="secondary" onClick={onRegenerateNatural} disabled={loading}>
+          <Button
+            size="sm"
+            className="w-full sm:w-auto"
+            variant="secondary"
+            onClick={onRegenerateNatural}
+            disabled={loading}
+          >
             더 자연스럽게
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
-        <div ref={pdfRef} className="space-y-4 rounded-md bg-white p-2">
+      <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+        <div ref={pdfRef} className="space-y-4 rounded-md bg-white p-1 sm:p-2">
           <Accordion type="multiple" className="w-full">
             {result.sections.map((section, index) => (
               <AccordionItem value={`item-${index}`} key={`${section.question}-${index}`}>
-                <AccordionTrigger>{section.question}</AccordionTrigger>
+                <AccordionTrigger className="leading-relaxed">{section.question}</AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-3">
-                    <p className="whitespace-pre-wrap text-zinc-700">{section.answer}</p>
+                    <p className="whitespace-pre-wrap break-words leading-relaxed text-zinc-700">
+                      {section.answer}
+                    </p>
                     <Button
                       variant="outline"
                       size="sm"
+                      className="w-full sm:w-auto"
                       onClick={() => copyText(section.answer)}
                     >
                       <Copy className="h-4 w-4" /> 복사
@@ -211,7 +226,7 @@ export function GenerationResult({
           {result.overallTip ? (
             <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
               <p className="font-medium">보완 팁</p>
-              <p>{result.overallTip}</p>
+              <p className="break-words leading-relaxed">{result.overallTip}</p>
             </div>
           ) : null}
         </div>

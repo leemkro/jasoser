@@ -203,16 +203,16 @@ export default function CreatePage() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1.1fr,0.9fr]">
-      <Card>
-        <CardHeader>
-          <CardTitle>자소서 생성</CardTitle>
-          <CardDescription>
+    <div className="grid gap-4 lg:grid-cols-[1.1fr,0.9fr] lg:gap-6">
+      <Card className="overflow-hidden">
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-lg sm:text-xl">자소서 생성</CardTitle>
+          <CardDescription className="leading-relaxed">
             기업/직무 정보와 본인 경험을 입력하면 문항 자동 생성 또는 직접 입력 문항 기반으로
             자소서 초안을 만듭니다.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="company">기업명</Label>
@@ -358,10 +358,10 @@ export default function CreatePage() {
             loading={submitting}
           />
         ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>생성 결과</CardTitle>
-              <CardDescription>
+          <Card className="overflow-hidden">
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-lg sm:text-xl">생성 결과</CardTitle>
+              <CardDescription className="leading-relaxed">
                 생성 후 문항별 결과를 펼쳐보고, 복사 또는 PDF 다운로드할 수 있습니다.
               </CardDescription>
             </CardHeader>
