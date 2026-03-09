@@ -10,6 +10,8 @@ const NEXT_PUBLIC_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const NEXT_PUBLIC_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export const env = {
+  openaiApiKey: () => required("OPENAI_API_KEY", process.env.OPENAI_API_KEY),
+  openaiModel: () => process.env.OPENAI_MODEL || "gpt-4o-mini",
   supabaseUrl: () =>
     NEXT_PUBLIC_SUPABASE_URL ?? required("SUPABASE_URL", process.env.SUPABASE_URL),
   supabaseAnonKey: () =>

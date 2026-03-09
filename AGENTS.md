@@ -7,7 +7,7 @@ Operational guide for coding agents working in `C:\toyworkspace\jasoser`.
 - **Stack**: Next.js 15 App Router + React 19 + TypeScript + Tailwind CSS v4 (via `@tailwindcss/postcss`).
 - **Data/Auth**: Supabase (`@supabase/ssr`, `@supabase/supabase-js`). Google OAuth + email/password.
 - **Payments**: Stripe (`stripe`, `@stripe/stripe-js`) **and** Toss Payments (`@tosspayments/tosspayments-sdk`).
-- **AI generation**: Pollinations API (server-side `fetch` to `https://text.pollinations.ai/`). No API key required. See `lib/openai.ts`.
+- **AI generation**: OpenAI API (server-side `fetch` to `https://api.openai.com/v1/chat/completions`). See `lib/openai.ts`.
 - **Forms**: `react-hook-form` + `@hookform/resolvers` + `zod`.
 - **Data fetching**: Server components use Supabase directly; client components use `swr` or `fetch`.
 - **UI primitives**: shadcn-style in `components/ui/` (Radix + CVA + `cn()` utility).
@@ -62,7 +62,9 @@ All env access goes through `lib/env.ts` (lazy getters with `required()` guard).
 - `NEXT_PUBLIC_APP_URL` (defaults to request origin)
 - `SUPABASE_SERVICE_ROLE_KEY` (admin operations, webhooks)
 
-**Note**: `.env.example` contains `GEMINI_API_KEY` and `GEMINI_MODEL` but these are **unused** — the AI provider was migrated to Pollinations (no key needed).
+**Required for AI generation**
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL` (optional, default: `gpt-4o-mini`)
 
 ## 7) Project Structure
 
@@ -78,7 +80,7 @@ components/               # Feature components (auth-panel, generation-result, e
 hooks/                    # Client hooks (use-user, use-supabase)
 lib/                      # Shared utilities
   env.ts                  # Centralized env access (ALWAYS use this)
-  openai.ts               # AI generation (Pollinations API)
+  openai.ts               # AI generation (OpenAI API)
   stripe.ts               # Stripe client singleton
   toss.ts                 # Toss Payments API helpers
   types.ts                # Shared domain types

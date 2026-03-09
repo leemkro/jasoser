@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { env } from "@/lib/env";
 import type { GeneratedEssay, GenerationInput } from "@/lib/types";
 
 const responseSchema = z.object({
@@ -153,30 +154,65 @@ JSON 스키마:
 }`;
 }
 
+const openAiResponseFormat = {
+  type: "json_schema",
+  json_schema: {
+    name: "generated_essay",
+    strict: true,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        title: { type: "string" },
+        sections: {
+          type: "array",
+          minItems: 1,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              question: { type: "string" },
+              answer: { type: "string" },
+            },
+            required: ["question", "answer"],
+          },
+        },
+        overallTip: { type: "string" },
+      },
+      required: ["title", "sections"],
+    },
+  },
+} as const;
+
 export async function generateEssay(input: GenerationInput): Promise<GeneratedEssay> {
   const maxRetries = 4;
   const minimumAnswerLength = getMinimumAnswerLength(input.characterLimit);
+  const apiKey = env.openaiApiKey();
+  const model = env.openaiModel();
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 55000);
 
     try {
-      const response = await fetch("https://text.pollinations.ai/", {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
         body: JSON.stringify({
-          model: "openai",
+          model,
           messages: [
             {
               role: "system",
-              content: "항상 엄격하게 JSON만 반환하는 한국어 자소서 생성기. 친절한 설명 문구를 JSON 밖에 절대 출력하지 마라.",
+              content:
+                "항상 엄격하게 JSON만 반환하는 한국어 자소서 생성기. 친절한 설명 문구를 JSON 밖에 절대 출력하지 마라.",
             },
             { role: "user", content: buildPrompt(input) },
           ],
-          temperature: 0.85,
-          jsonMode: true,
-          seed: Math.floor(Math.random() * 1000000),
+          temperature: 0.8,
+          response_format: openAiResponseFormat,
         }),
         signal: controller.signal,
       });
@@ -184,12 +220,31 @@ export async function generateEssay(input: GenerationInput): Promise<GeneratedEs
       clearTimeout(timeout);
 
       if (!response.ok) {
-        console.error(`Pollinations API error (attempt ${attempt + 1}):`, response.status);
+        const errorPayload = (await response.json().catch(() => null)) as
+          | { error?: { message?: string } }
+          | null;
+        console.error(
+          `OpenAI API error (attempt ${attempt + 1}):`,
+          response.status,
+          errorPayload?.error?.message ?? "Unknown error",
+        );
         if (attempt < maxRetries - 1) continue;
-        throw new Error(`AI API 호출 실패(${response.status})`);
+        throw new Error(
+          errorPayload?.error?.message
+            ? `AI API 호출 실패(${response.status}): ${errorPayload.error.message}`
+            : `AI API 호출 실패(${response.status})`,
+        );
       }
 
-      const rawText = await response.text();
+      const payload = (await response.json()) as {
+        choices?: Array<{
+          message?: {
+            content?: string | null;
+          };
+        }>;
+      };
+      const rawText = payload.choices?.[0]?.message?.content;
+
       if (!rawText || rawText.trim().length === 0) {
         console.error(`Empty response (attempt ${attempt + 1})`);
         if (attempt < maxRetries - 1) continue;
@@ -197,40 +252,6 @@ export async function generateEssay(input: GenerationInput): Promise<GeneratedEs
       }
 
       let content = rawText.trim();
-
-      // Unwrap various AI response wrapper formats
-      try {
-        const wrapper = JSON.parse(content) as Record<string, unknown>;
-        if (wrapper && typeof wrapper === "object") {
-          // Standard assistant message: { role: "assistant", content: "..." }
-          if (wrapper.role === "assistant" && typeof wrapper.content === "string") {
-            content = wrapper.content.trim();
-          }
-          // Tool-calls format: { role: "assistant", tool_calls: [{ function: { arguments: "..." } }] }
-          else if (Array.isArray(wrapper.tool_calls) && wrapper.tool_calls.length > 0) {
-            const firstCall = wrapper.tool_calls[0] as Record<string, unknown> | undefined;
-            const fn = firstCall?.function as Record<string, unknown> | undefined;
-            if (typeof fn?.arguments === "string") {
-              content = (fn.arguments as string).trim();
-            }
-          }
-          // Raw API response: { choices: [{ message: { content: "..." } }] }
-          else if (Array.isArray(wrapper.choices) && wrapper.choices.length > 0) {
-            const msg = (wrapper.choices[0] as Record<string, unknown>)?.message as Record<string, unknown> | undefined;
-            if (typeof msg?.content === "string") {
-              content = (msg.content as string).trim();
-            } else if (Array.isArray(msg?.tool_calls) && (msg.tool_calls as unknown[]).length > 0) {
-              const tc = (msg.tool_calls as Record<string, unknown>[])[0];
-              const fn = tc?.function as Record<string, unknown> | undefined;
-              if (typeof fn?.arguments === "string") {
-                content = (fn.arguments as string).trim();
-              }
-            }
-          }
-        }
-      } catch {
-        // Not a JSON wrapper, continue processing
-      }
 
       // Clean up
       content = content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
@@ -245,7 +266,6 @@ export async function generateEssay(input: GenerationInput): Promise<GeneratedEs
       content = content
         .replace(/,\s*\.\.\.\s*(?=[\]}])/g, "")
         .replace(/\.\.\.\s*(?=[\]}])/g, "")
-        .replace(/\/\/.*/g, "")
         .replace(/,\s*([\]}])/g, "$1")
         .replace(/[\x00-\x1F\x7F]/g, (ch) => ch === "\n" || ch === "\r" || ch === "\t" ? ch : "");
 
@@ -281,6 +301,11 @@ export async function generateEssay(input: GenerationInput): Promise<GeneratedEs
       if (err instanceof DOMException && err.name === "AbortError") {
         if (attempt < maxRetries - 1) continue;
         throw new Error("요청 시간이 초과되었습니다.");
+      }
+
+      if (err instanceof TypeError) {
+        if (attempt < maxRetries - 1) continue;
+        throw new Error("OpenAI API 연결에 실패했습니다. 잠시 후 다시 시도해 주세요.");
       }
 
       if (attempt === maxRetries - 1) throw err;
