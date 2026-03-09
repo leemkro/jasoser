@@ -120,11 +120,27 @@ function normalizeResultShape(payload: unknown): unknown {
   };
 }
 
+function buildQuestionInstruction(input: GenerationInput) {
+  if (input.questionMode !== "custom" || !input.customQuestions || input.customQuestions.length === 0) {
+    return "- 한국 채용에서 자주 나오는 핵심 문항을 3~4개 스스로 선정해 sections를 구성.";
+  }
+
+  const questionLines = input.customQuestions
+    .map((question) => `- ${question}`)
+    .join("\n");
+
+  return `- sections는 아래 사용자 지정 문항만 사용하고 순서를 반드시 유지.
+${questionLines}
+- question 값은 사용자 문항 원문을 그대로 사용.
+- 새 문항 추가/삭제 금지.`;
+}
+
 function buildPrompt(input: GenerationInput) {
   const naturalInstruction = input.makeNatural
     ? "문장 리듬을 조금 불규칙하게 하고, 개인적인 감정 표현을 자연스럽게 섞어 인간적인 문체를 강화해줘."
     : "문장 구조를 명확하게 유지하고, 채용담당자가 빠르게 읽을 수 있게 간결하게 작성해줘.";
   const minimumAnswerLength = getMinimumAnswerLength(input.characterLimit);
+  const questionInstruction = buildQuestionInstruction(input);
 
   return `너는 한국 취업 시장에 특화된 자소서 코치야.
 아래 정보를 바탕으로 한국 기업 스타일의 자기소개서 초안을 JSON으로만 생성해.
@@ -136,10 +152,12 @@ function buildPrompt(input: GenerationInput) {
 - 지원자 경험: ${input.experience}
 - 톤: ${input.tone}
 - 글자 수 제한: ${input.characterLimit}
+- 문항 모드: ${input.questionMode === "custom" ? "직접 입력" : "AI 자율 구성"}
 
 [작성 규칙]
 - 결과는 반드시 JSON 객체로만 반환.
 - 문항별 sections 배열을 제공.
+${questionInstruction}
 - 각 section.answer는 공백 제외 최소 ${minimumAnswerLength}자 이상으로 작성.
 - 각 section.answer는 가능한 ${input.characterLimit}자에 최대한 가깝게 작성.
 - 너무 짧은 요약형(3~5문장) 답변 금지.

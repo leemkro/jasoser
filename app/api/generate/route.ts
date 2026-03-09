@@ -16,7 +16,21 @@ const requestSchema = z.object({
   experience: z.string().min(20),
   tone: z.enum(["담백한", "열정적인", "전문적인", "친근한"]),
   characterLimit: z.number().min(300).max(2000),
+  questionMode: z.enum(["auto", "custom"]).default("auto"),
+  customQuestions: z
+    .array(z.string().trim().min(1))
+    .min(1)
+    .max(10)
+    .optional(),
   makeNatural: z.boolean().default(false),
+}).superRefine((value, ctx) => {
+  if (value.questionMode === "custom" && !value.customQuestions) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["customQuestions"],
+      message: "직접 문항 모드에서는 문항을 1개 이상 입력해야 합니다.",
+    });
+  }
 });
 
 function today() {
@@ -81,6 +95,8 @@ export async function POST(request: Request) {
       input: {
         posting: body.posting,
         experience: body.experience,
+        questionMode: body.questionMode,
+        customQuestions: body.questionMode === "custom" ? body.customQuestions ?? [] : null,
       },
       output: result,
     };

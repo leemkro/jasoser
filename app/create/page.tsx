@@ -18,15 +18,48 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSupabase } from "@/hooks/use-supabase";
 import { useUser } from "@/hooks/use-user";
 import type { GeneratedEssay } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
-const formSchema = z.object({
-  company: z.string().min(1, "기업명을 입력하세요."),
-  role: z.string().min(1, "직무를 입력하세요."),
-  posting: z.string().min(10, "채용공고 텍스트 또는 URL을 입력하세요."),
-  experience: z.string().min(20, "본인 경험을 더 자세히 작성해 주세요."),
-  tone: z.enum(["담백한", "열정적인", "전문적인", "친근한"]),
-  characterLimit: z.coerce.number().min(300).max(2000),
-});
+function parseCustomQuestions(text: string) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+const formSchema = z
+  .object({
+    company: z.string().min(1, "기업명을 입력하세요."),
+    role: z.string().min(1, "직무를 입력하세요."),
+    posting: z.string().min(10, "채용공고 텍스트 또는 URL을 입력하세요."),
+    experience: z.string().min(20, "본인 경험을 더 자세히 작성해 주세요."),
+    tone: z.enum(["담백한", "열정적인", "전문적인", "친근한"]),
+    characterLimit: z.coerce.number().min(300).max(2000),
+    questionMode: z.enum(["auto", "custom"]),
+    customQuestionsText: z.string(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.questionMode !== "custom") {
+      return;
+    }
+
+    const questions = parseCustomQuestions(value.customQuestionsText);
+    if (questions.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["customQuestionsText"],
+        message: "문항 직접 입력 모드에서는 문항을 1개 이상 입력해야 합니다.",
+      });
+    }
+
+    if (questions.length > 10) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["customQuestionsText"],
+        message: "문항은 최대 10개까지 입력할 수 있습니다.",
+      });
+    }
+  });
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -58,6 +91,8 @@ export default function CreatePage() {
       experience: "",
       tone: "담백한",
       characterLimit: 800,
+      questionMode: "auto",
+      customQuestionsText: "",
     },
   });
 
@@ -87,11 +122,17 @@ export default function CreatePage() {
       return;
     }
     try {
+      const { customQuestionsText, ...requestValues } = values;
+      const customQuestions = requestValues.questionMode === "custom"
+        ? parseCustomQuestions(customQuestionsText)
+        : undefined;
+
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...values,
+          ...requestValues,
+          customQuestions,
           makeNatural: naturalMode,
         }),
       });
@@ -151,6 +192,8 @@ export default function CreatePage() {
     }
   }
 
+  const questionMode = form.watch("questionMode");
+
   if (userLoading) {
     return (
       <div className="flex justify-center py-20">
@@ -165,7 +208,8 @@ export default function CreatePage() {
         <CardHeader>
           <CardTitle>자소서 생성</CardTitle>
           <CardDescription>
-            기업/직무 정보와 본인 경험을 입력하면 한국어 자소서 초안을 문항별로 생성합니다.
+            기업/직무 정보와 본인 경험을 입력하면 문항 자동 생성 또는 직접 입력 문항 기반으로
+            자소서 초안을 만듭니다.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -193,6 +237,72 @@ export default function CreatePage() {
               className="min-h-[180px]"
             />
           </div>
+
+          <div className="space-y-3">
+            <Label>문항 구성 방식</Label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label
+                htmlFor="question-mode-auto"
+                className={cn(
+                  "flex cursor-pointer items-start gap-3 rounded-md border p-3",
+                  questionMode === "auto" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200",
+                )}
+              >
+                <input
+                  id="question-mode-auto"
+                  type="radio"
+                  value="auto"
+                  className="mt-1 h-4 w-4 accent-zinc-900"
+                  {...form.register("questionMode")}
+                />
+                <div>
+                  <p className="text-sm font-medium">AI 자율 문항</p>
+                  <p className="text-xs text-zinc-500">AI가 문항을 구성해 답변합니다.</p>
+                </div>
+              </label>
+
+              <label
+                htmlFor="question-mode-custom"
+                className={cn(
+                  "flex cursor-pointer items-start gap-3 rounded-md border p-3",
+                  questionMode === "custom" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200",
+                )}
+              >
+                <input
+                  id="question-mode-custom"
+                  type="radio"
+                  value="custom"
+                  className="mt-1 h-4 w-4 accent-zinc-900"
+                  {...form.register("questionMode")}
+                />
+                <div>
+                  <p className="text-sm font-medium">문항 직접 입력</p>
+                  <p className="text-xs text-zinc-500">내가 넣은 문항에 맞춰 답변합니다.</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {questionMode === "custom" ? (
+            <div className="space-y-2">
+              <Label htmlFor="customQuestionsText">문항 입력</Label>
+              <Textarea
+                id="customQuestionsText"
+                {...form.register("customQuestionsText")}
+                className="min-h-[120px]"
+                placeholder={"예)\n1. 지원 동기\n2. 성격의 장단점\n3. 입사 후 포부"}
+              />
+              {form.formState.errors.customQuestionsText?.message ? (
+                <p className="text-sm text-red-600">
+                  {form.formState.errors.customQuestionsText.message}
+                </p>
+              ) : (
+                <p className="text-xs text-zinc-500">
+                  한 줄에 문항 1개씩 입력하세요. 최대 10개까지 가능합니다.
+                </p>
+              )}
+            </div>
+          ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
