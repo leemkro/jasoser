@@ -100,6 +100,7 @@ export default function CreatePage() {
         result?: GeneratedEssay;
         error?: string;
         remaining?: number;
+        historySaved?: boolean;
       };
 
       if (!response.ok || !payload.result) {
@@ -115,6 +116,9 @@ export default function CreatePage() {
       }
 
       toast.success("자소서 초안이 생성되었습니다.");
+      if (payload.historySaved === false) {
+        toast.error("생성 히스토리 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.");
     } finally {

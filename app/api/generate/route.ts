@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { generateEssay } from "@/lib/openai";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DAILY_LIMIT = 3;
@@ -106,7 +107,7 @@ export async function POST(request: Request) {
 
     const result = await generateEssay(body);
 
-    await supabase.from("generations").insert({
+    const generationPayload = {
       user_id: user.id,
       company: body.company,
       role: body.role,
@@ -116,9 +117,26 @@ export async function POST(request: Request) {
         experience: body.experience,
       },
       output: result,
-    });
+    };
 
-    return NextResponse.json({ result, remaining });
+    let historySaved = true;
+    const historyInsert = await supabase.from("generations").insert(generationPayload);
+    if (historyInsert.error) {
+      historySaved = false;
+      console.error("Failed to save generation history (user client):", historyInsert.error);
+
+      const admin = createSupabaseAdminClient();
+      if (admin) {
+        const adminInsert = await admin.from("generations").insert(generationPayload);
+        if (adminInsert.error) {
+          console.error("Failed to save generation history (admin client):", adminInsert.error);
+        } else {
+          historySaved = true;
+        }
+      }
+    }
+
+    return NextResponse.json({ result, remaining, historySaved });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "입력값이 올바르지 않습니다." }, { status: 400 });
