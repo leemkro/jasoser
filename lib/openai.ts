@@ -13,10 +13,19 @@ const responseSchema = z.object({
   overallTip: z.string().optional(),
 });
 
+function getMinimumAnswerLength(characterLimit: number) {
+  return Math.max(220, Math.floor(characterLimit * 0.7));
+}
+
+function countChars(text: string) {
+  return text.replace(/\s/g, "").length;
+}
+
 function buildPrompt(input: GenerationInput) {
   const naturalInstruction = input.makeNatural
     ? "문장 리듬을 조금 불규칙하게 하고, 개인적인 감정 표현을 자연스럽게 섞어 인간적인 문체를 강화해줘."
     : "문장 구조를 명확하게 유지하고, 채용담당자가 빠르게 읽을 수 있게 간결하게 작성해줘.";
+  const minimumAnswerLength = getMinimumAnswerLength(input.characterLimit);
 
   return `너는 한국 취업 시장에 특화된 자소서 코치야.
 아래 정보를 바탕으로 한국 기업 스타일의 자기소개서 초안을 JSON으로만 생성해.
@@ -32,7 +41,9 @@ function buildPrompt(input: GenerationInput) {
 [작성 규칙]
 - 결과는 반드시 JSON 객체로만 반환.
 - 문항별 sections 배열을 제공.
-- 각 section.answer는 가능한 ${input.characterLimit}자 내외.
+- 각 section.answer는 공백 제외 최소 ${minimumAnswerLength}자 이상으로 작성.
+- 각 section.answer는 가능한 ${input.characterLimit}자에 최대한 가깝게 작성.
+- 너무 짧은 요약형(3~5문장) 답변 금지.
 - 허위 경력/과장 표현 금지.
 - ${naturalInstruction}
 
@@ -46,6 +57,7 @@ JSON 스키마:
 
 export async function generateEssay(input: GenerationInput): Promise<GeneratedEssay> {
   const maxRetries = 3;
+  const minimumAnswerLength = getMinimumAnswerLength(input.characterLimit);
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     const controller = new AbortController();
@@ -120,6 +132,17 @@ export async function generateEssay(input: GenerationInput): Promise<GeneratedEs
         console.error(`Attempt ${attempt + 1}: Invalid response schema`);
         if (attempt < maxRetries - 1) continue;
         throw new Error("AI 응답 형식이 올바르지 않습니다.");
+      }
+
+      const hasShortSection = parsed.data.sections.some(
+        (section) => countChars(section.answer) < minimumAnswerLength,
+      );
+      if (hasShortSection) {
+        console.error(
+          `Attempt ${attempt + 1}: Response too short (min ${minimumAnswerLength} chars per section)`,
+        );
+        if (attempt < maxRetries - 1) continue;
+        throw new Error("생성 결과가 너무 짧습니다. 다시 시도해 주세요.");
       }
 
       return parsed.data;
