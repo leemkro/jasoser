@@ -195,25 +195,35 @@ export async function generateEssay(input: GenerationInput): Promise<GeneratedEs
     const timeout = setTimeout(() => controller.abort(), 55000);
 
     try {
+      const requestBody: {
+        model: string;
+        messages: Array<{
+          role: "system" | "user";
+          content: string;
+        }>;
+        response_format: typeof openAiResponseFormat;
+        temperature: number;
+      } = {
+        model,
+        messages: [
+          {
+            role: "system",
+            content:
+              "항상 엄격하게 JSON만 반환하는 한국어 자소서 생성기. 친절한 설명 문구를 JSON 밖에 절대 출력하지 마라.",
+          },
+          { role: "user", content: buildPrompt(input) },
+        ],
+        response_format: openAiResponseFormat,
+        temperature: 1,
+      };
+
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          model,
-          messages: [
-            {
-              role: "system",
-              content:
-                "항상 엄격하게 JSON만 반환하는 한국어 자소서 생성기. 친절한 설명 문구를 JSON 밖에 절대 출력하지 마라.",
-            },
-            { role: "user", content: buildPrompt(input) },
-          ],
-          temperature: 0.8,
-          response_format: openAiResponseFormat,
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
 
@@ -223,11 +233,13 @@ export async function generateEssay(input: GenerationInput): Promise<GeneratedEs
         const errorPayload = (await response.json().catch(() => null)) as
           | { error?: { message?: string } }
           | null;
+        const errorMessage = errorPayload?.error?.message ?? "Unknown error";
         console.error(
           `OpenAI API error (attempt ${attempt + 1}):`,
           response.status,
-          errorPayload?.error?.message ?? "Unknown error",
+          errorMessage,
         );
+
         if (attempt < maxRetries - 1) continue;
         throw new Error(
           errorPayload?.error?.message
