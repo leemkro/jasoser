@@ -16,7 +16,7 @@ const responseSchema = z.object({
 });
 
 function getMinimumAnswerLength(characterLimit: number) {
-  return Math.max(220, Math.min(650, Math.floor(characterLimit * 0.55)));
+  return Math.max(150, Math.min(500, Math.floor(characterLimit * 0.4)));
 }
 
 function countChars(text: string) {
@@ -198,11 +198,35 @@ export async function generateEssay(input: GenerationInput): Promise<GeneratedEs
 
       let content = rawText.trim();
 
-      // If response is a message wrapper, extract the content field
+      // Unwrap various AI response wrapper formats
       try {
-        const wrapper = JSON.parse(content) as { role?: string; content?: string };
-        if (wrapper.role === "assistant" && typeof wrapper.content === "string") {
-          content = wrapper.content.trim();
+        const wrapper = JSON.parse(content) as Record<string, unknown>;
+        if (wrapper && typeof wrapper === "object") {
+          // Standard assistant message: { role: "assistant", content: "..." }
+          if (wrapper.role === "assistant" && typeof wrapper.content === "string") {
+            content = wrapper.content.trim();
+          }
+          // Tool-calls format: { role: "assistant", tool_calls: [{ function: { arguments: "..." } }] }
+          else if (Array.isArray(wrapper.tool_calls) && wrapper.tool_calls.length > 0) {
+            const firstCall = wrapper.tool_calls[0] as Record<string, unknown> | undefined;
+            const fn = firstCall?.function as Record<string, unknown> | undefined;
+            if (typeof fn?.arguments === "string") {
+              content = (fn.arguments as string).trim();
+            }
+          }
+          // Raw API response: { choices: [{ message: { content: "..." } }] }
+          else if (Array.isArray(wrapper.choices) && wrapper.choices.length > 0) {
+            const msg = (wrapper.choices[0] as Record<string, unknown>)?.message as Record<string, unknown> | undefined;
+            if (typeof msg?.content === "string") {
+              content = (msg.content as string).trim();
+            } else if (Array.isArray(msg?.tool_calls) && (msg.tool_calls as unknown[]).length > 0) {
+              const tc = (msg.tool_calls as Record<string, unknown>[])[0];
+              const fn = tc?.function as Record<string, unknown> | undefined;
+              if (typeof fn?.arguments === "string") {
+                content = (fn.arguments as string).trim();
+              }
+            }
+          }
         }
       } catch {
         // Not a JSON wrapper, continue processing
