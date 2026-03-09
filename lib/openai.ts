@@ -4,12 +4,14 @@ import type { GeneratedEssay, GenerationInput } from "@/lib/types";
 
 const responseSchema = z.object({
   title: z.string(),
-  sections: z.array(
-    z.object({
-      question: z.string(),
-      answer: z.string(),
-    }),
-  ),
+  sections: z
+    .array(
+      z.object({
+        question: z.string(),
+        answer: z.string(),
+      }),
+    )
+    .min(1),
   overallTip: z.string().optional(),
 });
 
@@ -27,36 +29,93 @@ function normalizeResultShape(payload: unknown): unknown {
   }
 
   const obj = payload as Record<string, unknown>;
-  const rawSections = obj.sections ?? obj.items ?? obj.answers;
+  const rawSections =
+    obj.sections ??
+    obj.items ??
+    obj.answers ??
+    obj["문항"] ??
+    obj["문항들"] ??
+    obj["sections"] ??
+    obj["답변"];
 
-  if (!Array.isArray(rawSections)) {
-    return payload;
-  }
-
-  const sections = rawSections
-    .map((item, index) => {
-      if (!item || typeof item !== "object") {
+  const toSection = (
+    item: unknown,
+    index: number,
+  ): { question: string; answer: string } | null => {
+    if (typeof item === "string") {
+      const answer = item.trim();
+      if (answer.length === 0) {
         return null;
       }
-      const section = item as Record<string, unknown>;
-      const question = section.question ?? section.title ?? section.heading ?? `문항 ${index + 1}`;
-      const answer = section.answer ?? section.content ?? section.text;
-
-      if (typeof question !== "string" || typeof answer !== "string") {
-        return null;
-      }
-
       return {
-        question: question.trim(),
-        answer: answer.trim(),
+        question: `문항 ${index + 1}`,
+        answer,
       };
-    })
+    }
+
+    if (!item || typeof item !== "object") {
+      return null;
+    }
+
+    const section = item as Record<string, unknown>;
+    const question =
+      section.question ??
+      section.title ??
+      section.heading ??
+      section["문항"] ??
+      section["질문"] ??
+      section["제목"] ??
+      `문항 ${index + 1}`;
+    const answer = section.answer ?? section.content ?? section.text ?? section["답변"] ?? section["내용"];
+
+    if (typeof question !== "string" || typeof answer !== "string") {
+      return null;
+    }
+
+    return {
+      question: question.trim(),
+      answer: answer.trim(),
+    };
+  };
+
+  const sectionList = Array.isArray(rawSections)
+    ? rawSections
+    : rawSections && typeof rawSections === "object"
+      ? Object.values(rawSections as Record<string, unknown>)
+      : [];
+
+  let sections = sectionList
+    .map((item, index) => toSection(item, index))
     .filter((item): item is { question: string; answer: string } => item !== null);
 
+  if (sections.length === 0) {
+    const singleAnswer = obj.content ?? obj.text ?? obj.answer ?? obj["내용"] ?? obj["답변"];
+    if (typeof singleAnswer === "string" && singleAnswer.trim().length > 0) {
+      sections = [
+        {
+          question: "자기소개서 초안",
+          answer: singleAnswer.trim(),
+        },
+      ];
+    }
+  }
+
   return {
-    title: typeof obj.title === "string" ? obj.title : "자기소개서 초안",
+    title:
+      typeof obj.title === "string"
+        ? obj.title
+        : typeof obj["제목"] === "string"
+          ? obj["제목"]
+          : "자기소개서 초안",
     sections,
-    overallTip: typeof obj.overallTip === "string" ? obj.overallTip : undefined,
+    overallTip:
+      typeof obj.overallTip === "string"
+        ? obj.overallTip
+        : typeof obj["보완팁"] === "string"
+          ? obj["보완팁"]
+          : typeof obj["overall_tip"] === "string"
+            ? obj["overall_tip"]
+            : undefined,
   };
 }
 
