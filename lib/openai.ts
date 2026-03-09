@@ -229,7 +229,12 @@ export async function generateEssay(input: GenerationInput): Promise<GeneratedEs
       const normalized = normalizeResultShape(parsedJson);
       const parsed = responseSchema.safeParse(normalized);
       if (!parsed.success) {
-        console.error(`Attempt ${attempt + 1}: Invalid response schema`);
+        console.error(
+          `Attempt ${attempt + 1}: Invalid response schema`,
+          JSON.stringify(parsed.error.issues),
+          "\nRaw keys:", Object.keys(parsedJson),
+          "\nNormalized:", JSON.stringify(normalized).slice(0, 500),
+        );
         if (attempt < maxRetries - 1) continue;
         throw new Error("AI 응답 형식이 올바르지 않습니다.");
       }

@@ -70,7 +70,7 @@ All env access goes through `lib/env.ts` (lazy getters with `required()` guard).
 app/                      # Next.js App Router
   api/                    # API routes (generate, stripe, toss, webhooks)
   auth/callback/          # Supabase auth callback
-  (billing|create|dashboard|pricing|success)/  # Page routes
+  (billing|create|dashboard|pricing|success)/  # Page routes (pricing UI temporarily disabled)
   layout.tsx              # Root layout (server component, Korean locale)
   globals.css             # Tailwind + CSS tokens + keyframes
 components/               # Feature components (auth-panel, generation-result, etc.)
@@ -161,7 +161,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 - Never expose secret keys to client code.
 - AI calls, Stripe/Toss secret operations → server-side only.
-- Middleware is routing guard, not sole authorization (always verify `auth.getUser()` in API routes).
+- Middleware is routing guard, not sole authorization (always verify `auth.getUser()` in API routes). Authenticated users on `/` are redirected to `/create`.
 - Supabase admin client → server-only paths.
 - RLS enabled on all tables (see `supabase/schema.sql`).
 
