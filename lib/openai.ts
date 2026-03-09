@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { GeneratedEssay, GenerationInput } from "@/lib/types";
+import { env } from "@/lib/env";
 
 const responseSchema = z.object({
   title: z.string(),
@@ -46,27 +47,35 @@ JSON 스키마:
 
 export async function generateEssay(input: GenerationInput): Promise<GeneratedEssay> {
   const maxRetries = 3;
+  const apiKey = env.geminiApiKey();
+  const model = env.geminiModel();
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const systemInstruction =
+    "항상 엄격하게 JSON만 반환하는 한국어 자소서 생성기. 친절한 설명 문구를 JSON 밖에 절대 출력하지 마라.";
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 55000);
 
     try {
-      const response = await fetch("https://text.pollinations.ai/", {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "openai",
-          messages: [
+          systemInstruction: {
+            parts: [{ text: systemInstruction }],
+          },
+          contents: [
             {
-              role: "system",
-              content: "항상 엄격하게 JSON만 반환하는 한국어 자소서 생성기. 친절한 설명 문구를 JSON 밖에 절대 출력하지 마라.",
+              role: "user",
+              parts: [{ text: buildPrompt(input) }],
             },
-            { role: "user", content: buildPrompt(input) },
           ],
+          generationConfig: {
+            temperature: 0.85,
+            responseMimeType: "application/json",
+          },
           temperature: 0.85,
-          jsonMode: true,
-          seed: Math.floor(Math.random() * 1000000),
         }),
         signal: controller.signal,
       });
@@ -74,12 +83,24 @@ export async function generateEssay(input: GenerationInput): Promise<GeneratedEs
       clearTimeout(timeout);
 
       if (!response.ok) {
-        console.error(`Pollinations API error (attempt ${attempt + 1}):`, response.status);
+        console.error(`Gemini API error (attempt ${attempt + 1}):`, response.status);
         if (attempt < maxRetries - 1) continue;
         throw new Error(`AI API 호출 실패(${response.status})`);
       }
 
-      const rawText = await response.text();
+      const responseJson = (await response.json()) as {
+        candidates?: Array<{
+          content?: {
+            parts?: Array<{ text?: string }>;
+          };
+        }>;
+      };
+      const rawText =
+        responseJson.candidates?.[0]?.content?.parts
+          ?.map((part) => part.text ?? "")
+          .join("")
+          .trim() ?? "";
+
       if (!rawText || rawText.trim().length === 0) {
         console.error(`Empty response (attempt ${attempt + 1})`);
         if (attempt < maxRetries - 1) continue;
@@ -129,6 +150,11 @@ export async function generateEssay(input: GenerationInput): Promise<GeneratedEs
       if (err instanceof DOMException && err.name === "AbortError") {
         if (attempt < maxRetries - 1) continue;
         throw new Error("요청 시간이 초과되었습니다.");
+      }
+
+      if (err instanceof TypeError) {
+        if (attempt < maxRetries - 1) continue;
+        throw new Error("AI 서비스 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
       }
 
       if (attempt === maxRetries - 1) throw err;
