@@ -21,6 +21,15 @@ const features = [
   },
 ];
 
+const businessInfo = [
+  { label: "상호명", value: "동대문 프라임시티 1311호" },
+  { label: "사업자등록번호", value: "101-17-53943" },
+  { label: "연락처", value: "010-3570-6173" },
+  { label: "사업장주소", value: "서울시 동대문구 왕산로 18, 1311호(신설동)" },
+  { label: "대표자명", value: "이재훈" },
+  { label: "사업자유형", value: "간이과세자" },
+];
+
 export default function Home() {
   return (
     <div className="space-y-10">
@@ -61,13 +70,22 @@ export default function Home() {
         </section>
       </div>
 
-      <section className="rounded-lg border border-zinc-200 bg-white px-4 py-4 text-sm text-zinc-600 sm:px-6">
-        <p>상호명: 동대문 프라임시티 1311호</p>
-        <p>사업자등록번호: 101-17-53943</p>
-        <p>연락처: 010-3570-6173</p>
-        <p>사업장주소: 서울시 동대문구 왕산로 18, 1311호(신설동)</p>
-        <p>대표자명: 이재훈</p>
-        <p>사업자유형: 간이과세자</p>
+      <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+        <div className="border-b border-zinc-200 bg-gradient-to-r from-zinc-100 to-white px-4 py-4 sm:px-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+            Business Information
+          </p>
+          <p className="mt-1 text-base font-semibold text-zinc-900">사업자 필수정보</p>
+        </div>
+
+        <dl className="divide-y divide-zinc-200">
+          {businessInfo.map((item) => (
+            <div key={item.label} className="grid gap-1 px-4 py-3 sm:grid-cols-[140px,1fr] sm:gap-3 sm:px-6">
+              <dt className="text-xs font-semibold tracking-wide text-zinc-500">{item.label}</dt>
+              <dd className="text-sm text-zinc-700">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
     </div>
   );
