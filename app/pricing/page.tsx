@@ -76,7 +76,13 @@ export default function PricingPage() {
                   </Button>
                 )
               ) : (
-                <Button className="h-12 w-full text-base" size="lg" onClick={() => { window.location.href = "/"; }}>
+                <Button
+                  className="h-12 w-full text-base"
+                  size="lg"
+                  onClick={() => {
+                    window.location.href = "/";
+                  }}
+                >
                   로그인 후 구매하기
                 </Button>
               )}
@@ -84,6 +90,47 @@ export default function PricingPage() {
           </Card>
         ))}
       </div>
+
+      <Card className="border-zinc-200 bg-zinc-50/70">
+        <CardHeader>
+          <CardTitle>이용권 정책 안내</CardTitle>
+          <CardDescription>결제 전 아래 내용을 확인해 주세요.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5 text-sm leading-6 text-zinc-700">
+          <div className="space-y-1">
+            <p className="font-semibold text-zinc-900">서비스 제공기간(건수 표시)</p>
+            <p>
+              결제 완료 즉시 이용권이 충전되며, 잔여 건수는 대시보드와 생성 페이지에서
+              {` "남은 이용권 N회"`} 형태로 표시됩니다. 이용권은 소진 시까지 사용할 수 있으며 월 자동결제는
+              제공하지 않습니다.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <p className="font-semibold text-zinc-900">교환</p>
+            <p>
+              이용권은 무형 디지털 상품 특성상 구매 완료 후 다른 패키지로 직접 교환할 수 없습니다. 패키지를
+              잘못 선택한 경우에는 미사용 건에 한해 결제 취소 후 원하는 상품으로 다시 구매해 주세요.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <p className="font-semibold text-zinc-900">환불정책</p>
+            <p>
+              미사용 이용권은 결제일 포함 7일 이내 전액 환불을 요청할 수 있습니다. 일부 사용한 이용권은
+              사용된 건수를 제외한 잔여분 기준으로 환불되며, 결제대행 수수료 등 실비가 공제될 수 있습니다.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <p className="font-semibold text-zinc-900">취소규정</p>
+            <p>
+              결제 취소는 구매 내역 확인 후 처리됩니다. 이미 사용된 건수는 취소 대상에서 제외되며, 비정상
+              사용이나 약관 위반이 확인된 경우 환불 또는 취소가 제한될 수 있습니다.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
