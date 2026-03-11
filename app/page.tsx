@@ -1,4 +1,4 @@
-import { FileText, RefreshCw } from "lucide-react";
+import { CreditCard, FileText, RefreshCw } from "lucide-react";
 
 import { AuthPanel } from "@/components/auth-panel";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,12 +14,11 @@ const features = [
     title: "AI 자연스럽게 재생성",
     description: "한 번 더 클릭으로 문체를 다듬어요.",
   },
-  // TODO: 프리미엄 카드 — 나중에 다시 활성화
-  // {
-  //   icon: CreditCard,
-  //   title: "월 9,900원 프리미엄",
-  //   description: "무제한 생성과 히스토리 관리까지.",
-  // },
+  {
+    icon: CreditCard,
+    title: "월 9,900원 프리미엄",
+    description: "무제한 생성과 히스토리 관리까지.",
+  },
 ];
 
 export default function Home() {

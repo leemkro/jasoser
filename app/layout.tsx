@@ -54,11 +54,9 @@ export default async function RootLayout({
                     </Link>
                   </>
                 ) : null}
-                {/* TODO: 요금제 링크 — 나중에 다시 활성화
                 <Link href="/pricing" className="text-sm text-zinc-600 hover:text-zinc-900">
                   요금제
                 </Link>
-                */}
                 {user ? <UserMenu email={user.email} /> : null}
               </nav>
             </div>
