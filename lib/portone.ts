@@ -1,10 +1,7 @@
 import { env } from "@/lib/env";
+import { CREDIT_PACKAGES, getCreditPackageById } from "@/lib/credit-packages";
 
-export const PORTONE_PREMIUM_PLAN = {
-  amount: 4900,
-  name: "자소서바이브 프리미엄",
-  description: "월 4,900원 무제한 생성",
-};
+export { CREDIT_PACKAGES, getCreditPackageById };
 
 const PORTONE_API_BASE = "https://api.iamport.kr";
 

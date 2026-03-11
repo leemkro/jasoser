@@ -33,9 +33,21 @@ create table if not exists public.daily_usage (
   unique (user_id, feature, usage_date)
 );
 
+create table if not exists public.credit_purchases (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  imp_uid text not null unique,
+  merchant_uid text not null unique,
+  package_id text not null,
+  amount integer not null,
+  credits integer not null,
+  created_at timestamptz default now()
+);
+
 alter table public.profiles enable row level security;
 alter table public.generations enable row level security;
 alter table public.daily_usage enable row level security;
+alter table public.credit_purchases enable row level security;
 
 create policy "profiles_select_own"
 on public.profiles
@@ -67,4 +79,14 @@ create policy "daily_usage_modify_own"
 on public.daily_usage
 for all
 using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+create policy "credit_purchases_select_own"
+on public.credit_purchases
+for select
+using (auth.uid() = user_id);
+
+create policy "credit_purchases_insert_own"
+on public.credit_purchases
+for insert
 with check (auth.uid() = user_id);

@@ -13,6 +13,8 @@ export default function BillingSuccessPage() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
+  const [creditsAdded, setCreditsAdded] = useState(0);
+  const [remainingCredits, setRemainingCredits] = useState(0);
 
   useEffect(() => {
     const impUid = searchParams.get("imp_uid") ?? searchParams.get("impUid");
@@ -39,14 +41,21 @@ export default function BillingSuccessPage() {
           body: JSON.stringify({ impUid, merchantUid }),
         });
 
-        const payload = await response.json();
+        const payload = (await response.json()) as {
+          success?: boolean;
+          error?: string;
+          creditsAdded?: number;
+          remainingCredits?: number;
+        };
 
         if (!response.ok || !payload.success) {
           throw new Error(payload.error ?? "결제 처리에 실패했습니다.");
         }
 
+        setCreditsAdded(payload.creditsAdded ?? 0);
+        setRemainingCredits(payload.remainingCredits ?? 0);
         setStatus("success");
-        toast.success("프리미엄 구독이 시작되었습니다!");
+        toast.success("이용권 충전이 완료되었습니다!");
       } catch (error) {
         setStatus("error");
         setErrorMessage(error instanceof Error ? error.message : "결제 처리 중 오류가 발생했습니다.");
@@ -94,8 +103,12 @@ export default function BillingSuccessPage() {
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
             <span className="text-2xl">✓</span>
           </div>
-          <CardTitle>구독이 시작되었습니다!</CardTitle>
-          <CardDescription>자소서바이브 프리미엄을 이용해 주셔서 감사합니다.</CardDescription>
+          <CardTitle>이용권 충전 완료</CardTitle>
+          <CardDescription>
+            {creditsAdded > 0
+              ? `${creditsAdded}회 이용권이 추가되었습니다. 현재 남은 이용권은 ${remainingCredits}회입니다.`
+              : `이미 반영된 결제입니다. 현재 남은 이용권은 ${remainingCredits}회입니다.`}
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           <Button asChild>

@@ -64,23 +64,20 @@ const formSchema = z
 type FormValues = z.infer<typeof formSchema>;
 
 export default function CreatePage() {
-  const { user, isPremium, loading: userLoading } = useUser();
+  const { user, loading: userLoading } = useUser();
   const usage = useSupabase(user?.id);
   const userId = user?.id;
   const { getLocalRemainingCount, getRemainingCount } = usage;
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<GeneratedEssay | null>(null);
   const [naturalMode, setNaturalMode] = useState(false);
-  const [remaining, setRemaining] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null;
-    return getLocalRemainingCount();
-  });
+  const [remaining, setRemaining] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!userId || isPremium) return;
+    if (!userId) return;
     setRemaining(getLocalRemainingCount());
     getRemainingCount().then(setRemaining);
-  }, [userId, isPremium, getLocalRemainingCount, getRemainingCount]);
+  }, [userId, getLocalRemainingCount, getRemainingCount]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -97,14 +94,11 @@ export default function CreatePage() {
   });
 
   const isBlocked = useMemo(() => {
-    if (isPremium) {
-      return false;
-    }
     if (remaining === null) {
       return false;
     }
     return remaining <= 0;
-  }, [isPremium, remaining]);
+  }, [remaining]);
 
   async function submit(values: FormValues) {
     if (!user) {
@@ -116,8 +110,8 @@ export default function CreatePage() {
 
     const remainingCount = await usage.getRemainingCount();
 
-    if (!isPremium && remainingCount <= 0) {
-      toast.error("무료 생성 횟수를 모두 사용했습니다. 프리미엄을 이용해 주세요.");
+    if (remainingCount <= 0) {
+      toast.error("이용권이 부족합니다. 이용권 충전 후 다시 시도해 주세요.");
       setSubmitting(false);
       return;
     }
@@ -152,7 +146,7 @@ export default function CreatePage() {
       if (typeof payload.remaining === "number") {
         setRemaining(payload.remaining);
         usage.syncLocalFromRemaining(payload.remaining);
-      } else if (!isPremium) {
+      } else {
         usage.incrementLocalFallback();
       }
 
@@ -168,20 +162,18 @@ export default function CreatePage() {
   }
 
   async function regenerateNatural() {
-    if (!isPremium && remaining !== null && remaining <= 0) {
-      toast.error("무료 생성 횟수를 모두 사용했습니다. 프리미엄을 이용해 주세요.");
+    if (remaining !== null && remaining <= 0) {
+      toast.error("이용권이 부족합니다. 이용권 충전 후 다시 시도해 주세요.");
       return;
     }
 
-    if (!isPremium) {
-      const remainingCount = await usage.getRemainingCount();
-      setRemaining(remainingCount);
+    const remainingCount = await usage.getRemainingCount();
+    setRemaining(remainingCount);
 
-      if (remainingCount <= 0) {
-        usage.syncLocalFromRemaining(remainingCount);
-        toast.error("무료 생성 횟수를 모두 사용했습니다. 프리미엄을 이용해 주세요.");
-        return;
-      }
+    if (remainingCount <= 0) {
+      usage.syncLocalFromRemaining(remainingCount);
+      toast.error("이용권이 부족합니다. 이용권 충전 후 다시 시도해 주세요.");
+      return;
     }
 
     setNaturalMode(true);
@@ -329,8 +321,8 @@ export default function CreatePage() {
             </div>
           </div>
 
-          {remaining !== null && !isPremium ? (
-            <p className="text-sm text-zinc-500">오늘 무료 남은 횟수: {remaining}</p>
+          {remaining !== null ? (
+            <p className="text-sm text-zinc-500">남은 이용권: {remaining}회</p>
           ) : null}
 
           {submitting ? (

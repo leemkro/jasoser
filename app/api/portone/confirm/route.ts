@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getPortOnePayment, PORTONE_PREMIUM_PLAN } from "@/lib/portone";
+import { CREDIT_PACKAGES, getPortOnePayment } from "@/lib/portone";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -23,8 +23,10 @@ export async function POST(request: Request) {
     }
 
     const body = requestSchema.parse(await request.json());
-    const orderPrefix = `sub_${user.id}_`;
-    if (!body.merchantUid.startsWith(orderPrefix)) {
+    const selectedPackage = CREDIT_PACKAGES.find((item) =>
+      body.merchantUid.startsWith(`credits_${item.id}_${user.id}_`),
+    );
+    if (!selectedPackage) {
       return NextResponse.json({ error: "유효하지 않은 결제 요청입니다." }, { status: 400 });
     }
 
@@ -37,24 +39,66 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "결제가 완료되지 않았습니다." }, { status: 400 });
     }
 
-    if (Math.round(payment.amount) !== PORTONE_PREMIUM_PLAN.amount) {
+    if (Math.round(payment.amount) !== selectedPackage.amount) {
       return NextResponse.json({ error: "결제 금액이 올바르지 않습니다." }, { status: 400 });
     }
 
-    const periodEnd = new Date();
-    periodEnd.setDate(periodEnd.getDate() + 30);
+    const purchaseInsert = await supabase.from("credit_purchases").insert({
+      user_id: user.id,
+      imp_uid: payment.impUid,
+      merchant_uid: payment.merchantUid,
+      package_id: selectedPackage.id,
+      amount: selectedPackage.amount,
+      credits: selectedPackage.credits,
+    });
 
-    await supabase.from("profiles").upsert({
+    if (purchaseInsert.error) {
+      if (purchaseInsert.error.code === "23505") {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("credits")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        return NextResponse.json({
+          success: true,
+          creditsAdded: 0,
+          remainingCredits: profile?.credits ?? 0,
+          alreadyProcessed: true,
+        });
+      }
+
+      throw new Error(purchaseInsert.error.message);
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("credits")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      throw new Error(profileError.message);
+    }
+
+    const nextCredits = (profile?.credits ?? 0) + selectedPackage.credits;
+
+    const profileUpsert = await supabase.from("profiles").upsert({
       id: user.id,
       email: user.email,
-      subscription_status: "active",
+      subscription_status: "free",
       billing_key: payment.impUid,
-      toss_customer_key: null,
-      current_period_end: periodEnd.toISOString(),
+      credits: nextCredits,
     });
+
+    if (profileUpsert.error) {
+      throw new Error(profileUpsert.error.message);
+    }
 
     return NextResponse.json({
       success: true,
+      creditsAdded: selectedPackage.credits,
+      remainingCredits: nextCredits,
       paidAt: payment.paidAt,
     });
   } catch (error) {

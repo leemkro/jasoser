@@ -7,14 +7,14 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 interface UseUserState {
   user: User | null;
-  isPremium: boolean;
+  credits: number;
   loading: boolean;
 }
 
 export function useUser() {
   const [state, setState] = useState<UseUserState>({
     user: null,
-    isPremium: false,
+    credits: 0,
     loading: true,
   });
 
@@ -27,21 +27,17 @@ export function useUser() {
     } = await supabase.auth.getUser();
 
     if (error || !user) {
-      setState({ user: null, isPremium: false, loading: false });
+      setState({ user: null, credits: 0, loading: false });
       return;
     }
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("subscription_status")
+      .select("credits")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    const isPremium = ["active", "trialing"].includes(
-      profile?.subscription_status ?? "free",
-    );
-
-    setState({ user, isPremium, loading: false });
+    setState({ user, credits: profile?.credits ?? 0, loading: false });
   }, [supabase]);
 
   useEffect(() => {

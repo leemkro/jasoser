@@ -4,14 +4,10 @@ import { useCallback, useMemo, useState } from "react";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
-const FREE_DAILY_LIMIT = 3;
+const DEFAULT_CREDITS = 0;
 
-function getTodayKey() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function getLocalUsageKey(userId: string) {
-  return `jasoseovibe:usage:${userId}:${getTodayKey()}`;
+function getLocalCreditsKey(userId: string) {
+  return `jasoseovibe:credits:${userId}`;
 }
 
 export function useSupabase(userId?: string | null) {
@@ -20,33 +16,23 @@ export function useSupabase(userId?: string | null) {
 
   const getRemainingCount = useCallback(async () => {
     if (!userId) {
-      return FREE_DAILY_LIMIT;
+      return DEFAULT_CREDITS;
     }
 
     setLoading(true);
     try {
-      const today = getTodayKey();
       const { data, error } = await supabase
-        .from("daily_usage")
-        .select("used_count")
-        .eq("user_id", userId)
-        .eq("usage_date", today)
-        .eq("feature", "generation")
-        .order("created_at", { ascending: false })
-        .limit(1)
+        .from("profiles")
+        .select("credits")
+        .eq("id", userId)
         .maybeSingle();
 
       if (error) {
-        // Query failure should not hard-block the user at 0.
-        // Server-side /api/generate is the source of truth for quota enforcement.
-        return FREE_DAILY_LIMIT;
+        const localRaw = localStorage.getItem(getLocalCreditsKey(userId));
+        return Math.max(0, localRaw ? Number(localRaw) : DEFAULT_CREDITS);
       }
 
-      if (!data) {
-        return FREE_DAILY_LIMIT;
-      }
-
-      return Math.max(0, FREE_DAILY_LIMIT - (data.used_count ?? 0));
+      return Math.max(0, data?.credits ?? DEFAULT_CREDITS);
     } finally {
       setLoading(false);
     }
@@ -57,9 +43,9 @@ export function useSupabase(userId?: string | null) {
       return;
     }
 
-    const key = getLocalUsageKey(userId);
-    const current = Number(localStorage.getItem(key) ?? "0");
-    localStorage.setItem(key, String(current + 1));
+    const key = getLocalCreditsKey(userId);
+    const current = Number(localStorage.getItem(key) ?? String(DEFAULT_CREDITS));
+    localStorage.setItem(key, String(Math.max(0, current - 1)));
   }, [userId]);
 
   const syncLocalFromRemaining = useCallback(
@@ -68,23 +54,23 @@ export function useSupabase(userId?: string | null) {
         return;
       }
 
-      const used = Math.max(0, FREE_DAILY_LIMIT - remaining);
-      localStorage.setItem(getLocalUsageKey(userId), String(used));
+      localStorage.setItem(getLocalCreditsKey(userId), String(Math.max(0, remaining)));
     },
     [userId],
   );
 
   const getLocalRemainingCount = useCallback(() => {
-    if (!userId) return FREE_DAILY_LIMIT;
-    const localRaw = localStorage.getItem(getLocalUsageKey(userId));
-    const localUsed = localRaw ? Number(localRaw) : 0;
-    return Math.max(0, FREE_DAILY_LIMIT - localUsed);
+    if (!userId) {
+      return DEFAULT_CREDITS;
+    }
+
+    const localRaw = localStorage.getItem(getLocalCreditsKey(userId));
+    return Math.max(0, localRaw ? Number(localRaw) : DEFAULT_CREDITS);
   }, [userId]);
 
   return useMemo(
     () => ({
       loading,
-      freeDailyLimit: FREE_DAILY_LIMIT,
       getRemainingCount,
       getLocalRemainingCount,
       incrementLocalFallback,

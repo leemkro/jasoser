@@ -20,7 +20,7 @@ export default async function DashboardPage() {
   }
 
   const [profileResult, generationResult] = await Promise.all([
-    supabase.from("profiles").select("subscription_status").eq("id", user.id).single(),
+    supabase.from("profiles").select("credits").eq("id", user.id).single(),
     supabase
       .from("generations")
       .select("id, company, role, tone, created_at, output")
@@ -29,7 +29,7 @@ export default async function DashboardPage() {
       .limit(30),
   ]);
 
-  const subscriptionStatus = profileResult.data?.subscription_status ?? "free";
+  const credits = profileResult.data?.credits ?? 0;
   const history = (generationResult.data ?? []) as GenerationRow[];
 
   return (
@@ -37,11 +37,11 @@ export default async function DashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900">대시보드</h1>
-          <p className="text-sm text-zinc-600">생성 기록과 구독 상태를 확인하세요.</p>
+          <p className="text-sm text-zinc-600">생성 기록과 이용권 잔여 횟수를 확인하세요.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant={subscriptionStatus === "active" ? "success" : "secondary"}>
-            {subscriptionStatus === "active" ? "프리미엄" : "무료"}
+          <Badge variant={credits > 0 ? "success" : "secondary"}>
+            남은 이용권 {credits}회
           </Badge>
           <Button asChild>
             <Link href="/create">새 자소서 만들기</Link>

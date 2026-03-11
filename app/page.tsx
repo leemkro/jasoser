@@ -16,8 +16,8 @@ const features = [
   },
   {
     icon: CreditCard,
-    title: "월 9,900원 프리미엄",
-    description: "무제한 생성과 히스토리 관리까지.",
+    title: "건수형 이용권 결제",
+    description: "5회·15회·40회 이용권 중 선택 구매.",
   },
 ];
 

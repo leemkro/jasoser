@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { Check } from "lucide-react";
-import { toast } from "sonner";
 
+import { CREDIT_PACKAGES } from "@/lib/credit-packages";
 import { PortoneBillingButton } from "@/components/portone-billing-button";
-import { StripeCheckoutButton } from "@/components/stripe-checkout-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
@@ -14,45 +12,8 @@ import { useUser } from "@/hooks/use-user";
 const portoneStoreId = process.env.NEXT_PUBLIC_PORTONE_STORE_ID ?? "";
 const portonePgProvider = process.env.NEXT_PUBLIC_PORTONE_PG_PROVIDER ?? "";
 
-const freePlan = {
-  name: "무료",
-  price: "0원",
-  features: ["하루 3회 생성", "문항별 결과 보기", "PDF 다운로드"],
-};
-
-const premiumPlan = {
-  name: "프리미엄",
-  price: "4,900원",
-  features: [
-    "일일 생성 횟수 무제한",
-    "더 자연스럽게 재생성 무제한",
-    "생성 히스토리 관리",
-    "PDF 다운로드",
-  ],
-};
-
 export default function PricingPage() {
-  const { user, isPremium, loading } = useUser();
-  const [canceling, setCanceling] = useState(false);
-
-  async function cancelSubscription() {
-    setCanceling(true);
-    try {
-      const response = await fetch("/api/portone/cancel", { method: "POST" });
-      const payload = await response.json();
-
-      if (!response.ok || !payload.success) {
-        throw new Error(payload.error ?? "구독 취소에 실패했습니다.");
-      }
-
-      toast.success("구독이 취소되었습니다. 남은 기간까지 프리미엄을 이용할 수 있습니다.");
-      window.location.reload();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "구독 취소 중 오류가 발생했습니다.");
-    } finally {
-      setCanceling(false);
-    }
-  }
+  const { user, loading, credits } = useUser();
 
   if (loading) {
     return (
@@ -63,82 +24,65 @@ export default function PricingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="mx-auto max-w-5xl space-y-8">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-zinc-900">요금제</h1>
-        <p className="mt-2 text-zinc-500">나에게 맞는 플랜을 선택하세요.</p>
+        <h1 className="text-3xl font-bold text-zinc-900">이용권 충전</h1>
+        <p className="mt-2 text-zinc-500">필요한 횟수만큼 이용권을 구매해 사용하세요.</p>
+        {user ? <p className="mt-1 text-sm text-zinc-600">현재 남은 이용권: {credits}회</p> : null}
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        {/* 무료 플랜 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{freePlan.name}</CardTitle>
-            <CardDescription>기본 기능을 무료로 이용하세요.</CardDescription>
-            <p className="mt-2 text-3xl font-bold text-zinc-900">{freePlan.price}<span className="text-base font-normal text-zinc-500"> /월</span></p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ul className="space-y-2.5 text-sm text-zinc-700">
-              {freePlan.features.map((f) => (
-                <li key={f} className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-zinc-400" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <Button variant="outline" className="w-full" disabled>
-              {isPremium ? "무료 플랜" : "현재 이용 중"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* 프리미엄 플랜 */}
-        <Card className="border-zinc-900 shadow-lg">
-          <CardHeader>
-            <div className="mb-1 inline-block w-fit rounded-full bg-zinc-900 px-3 py-0.5 text-xs font-semibold text-white">
-              추천
-            </div>
-            <CardTitle>{premiumPlan.name}</CardTitle>
-            <CardDescription>무제한으로 자소서를 생성하세요.</CardDescription>
-            <p className="mt-2 text-3xl font-bold text-zinc-900">{premiumPlan.price}<span className="text-base font-normal text-zinc-500"> /월</span></p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ul className="space-y-2.5 text-sm text-zinc-700">
-              {premiumPlan.features.map((f) => (
-                <li key={f} className="flex items-center gap-2">
+      <div className="grid gap-6 md:grid-cols-3">
+        {CREDIT_PACKAGES.map((item) => (
+          <Card key={item.id} className={item.highlight ? "border-zinc-900 shadow-lg" : ""}>
+            <CardHeader>
+              {item.highlight ? (
+                <div className="mb-1 inline-block w-fit rounded-full bg-zinc-900 px-3 py-0.5 text-xs font-semibold text-white">
+                  추천
+                </div>
+              ) : null}
+              <CardTitle>{item.title}</CardTitle>
+              <CardDescription>{item.credits}회 생성 가능한 충전형 이용권</CardDescription>
+              <p className="mt-2 text-3xl font-bold text-zinc-900">
+                {item.amount.toLocaleString("ko-KR")}원
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ul className="space-y-2.5 text-sm text-zinc-700">
+                <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-emerald-600" />
-                  {f}
+                  구매 즉시 이용권 충전
                 </li>
-              ))}
-            </ul>
-            {isPremium ? (
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={cancelSubscription}
-                disabled={canceling}
-              >
-                {canceling ? <Spinner /> : null}
-                구독 취소하기
-              </Button>
-            ) : user ? (
-              portoneStoreId.trim().length > 0 ? (
-                <PortoneBillingButton
-                  storeId={portoneStoreId}
-                  pgProvider={portonePgProvider || undefined}
-                  userId={user.id}
-                  userEmail={user.email ?? undefined}
-                />
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-emerald-600" />
+                  1회 생성 시 이용권 1회 차감
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-emerald-600" />
+                  문항별 결과 보기, PDF 다운로드 포함
+                </li>
+              </ul>
+              {user ? (
+                portoneStoreId.trim().length > 0 ? (
+                  <PortoneBillingButton
+                    storeId={portoneStoreId}
+                    pgProvider={portonePgProvider || undefined}
+                    userId={user.id}
+                    userEmail={user.email ?? undefined}
+                    creditPackage={item}
+                  />
+                ) : (
+                  <Button className="h-12 w-full text-base" size="lg" disabled>
+                    결제 설정이 필요합니다
+                  </Button>
+                )
               ) : (
-                <StripeCheckoutButton />
-              )
-            ) : (
-              <Button className="h-12 w-full text-base" size="lg" onClick={() => { window.location.href = "/"; }}>
-                로그인 후 구독하기
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+                <Button className="h-12 w-full text-base" size="lg" onClick={() => { window.location.href = "/"; }}>
+                  로그인 후 구매하기
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );

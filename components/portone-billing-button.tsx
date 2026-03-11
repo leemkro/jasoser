@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
+import type { CreditPackage } from "@/lib/credit-packages";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -11,6 +12,7 @@ interface PortoneBillingButtonProps {
   pgProvider?: string;
   userId: string;
   userEmail?: string;
+  creditPackage: CreditPackage;
   disabled?: boolean;
 }
 
@@ -44,11 +46,6 @@ declare global {
     IMP?: PortOneBrowserClient;
   }
 }
-
-const PREMIUM_PLAN = {
-  amount: 4900,
-  name: "자소서바이브 프리미엄",
-};
 
 function loadPortOneScript() {
   return new Promise<void>((resolve, reject) => {
@@ -94,6 +91,7 @@ export function PortoneBillingButton({
   pgProvider,
   userId,
   userEmail,
+  creditPackage,
   disabled,
 }: PortoneBillingButtonProps) {
   const [loading, setLoading] = useState(false);
@@ -109,7 +107,7 @@ export function PortoneBillingButton({
         throw new Error("포트원 SDK가 초기화되지 않았습니다.");
       }
 
-      const merchantUid = `sub_${userId}_${Date.now()}`;
+      const merchantUid = `credits_${creditPackage.id}_${userId}_${Date.now()}`;
       const successUrl = `${window.location.origin}/billing/success`;
       const failUrl = `${window.location.origin}/billing/fail`;
 
@@ -119,8 +117,8 @@ export function PortoneBillingButton({
           ...(pgProvider ? { pg: pgProvider } : {}),
           pay_method: "card",
           merchant_uid: merchantUid,
-          name: PREMIUM_PLAN.name,
-          amount: PREMIUM_PLAN.amount,
+          name: `자소서바이브 ${creditPackage.title}`,
+          amount: creditPackage.amount,
           buyer_email: userEmail,
           m_redirect_url: successUrl,
         },
@@ -152,7 +150,7 @@ export function PortoneBillingButton({
   return (
     <Button className="h-12 w-full text-base" size="lg" onClick={handleClick} disabled={disabled || loading}>
       {loading ? <Spinner /> : null}
-      프리미엄 구독하기
+      {creditPackage.amount.toLocaleString("ko-KR")}원 구매하기
     </Button>
   );
 }

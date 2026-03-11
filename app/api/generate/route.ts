@@ -5,8 +5,6 @@ import { generateEssay } from "@/lib/openai";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const DAILY_LIMIT = 3;
-
 export const runtime = "nodejs";
 
 const requestSchema = z.object({
@@ -33,10 +31,6 @@ const requestSchema = z.object({
   }
 });
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export async function POST(request: Request) {
   try {
     const supabase = await createSupabaseServerClient();
@@ -50,39 +44,22 @@ export async function POST(request: Request) {
 
     const body = requestSchema.parse(await request.json());
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("subscription_status")
+      .select("credits")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    const premium = ["active", "trialing"].includes(profile?.subscription_status ?? "free");
+    if (profileError) {
+      return NextResponse.json({ error: "이용권 정보를 불러오지 못했습니다." }, { status: 500 });
+    }
 
-    let remaining = null as number | null;
-    let usageTrackingUnavailable = false;
-    let usageRow: { id: string; used_count: number | null } | null = null;
-    if (!premium) {
-      const usageQuery = await supabase
-        .from("daily_usage")
-        .select("id, used_count")
-        .eq("user_id", user.id)
-        .eq("feature", "generation")
-        .eq("usage_date", today())
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (usageQuery.error) {
-        usageTrackingUnavailable = true;
-      }
-
-      usageRow = usageQuery.data;
-      if (!usageTrackingUnavailable && (usageRow?.used_count ?? 0) >= DAILY_LIMIT) {
-        return NextResponse.json(
-          { error: "오늘 무료 생성 횟수를 모두 사용했습니다." },
-          { status: 429 },
-        );
-      }
+    const currentCredits = Math.max(0, profile?.credits ?? 0);
+    if (currentCredits <= 0) {
+      return NextResponse.json(
+        { error: "이용권이 부족합니다. 이용권 충전 후 다시 시도해 주세요." },
+        { status: 429 },
+      );
     }
 
     const result = await generateEssay(body);
@@ -118,39 +95,18 @@ export async function POST(request: Request) {
       }
     }
 
-    if (!premium && !usageTrackingUnavailable) {
-      if (!usageRow) {
-        const insertResult = await supabase
-          .from("daily_usage")
-          .insert({
-            user_id: user.id,
-            feature: "generation",
-            usage_date: today(),
-            used_count: 1,
-            limit_count: DAILY_LIMIT,
-          })
-          .select("used_count")
-          .single();
+    let remaining = Math.max(0, currentCredits - 1);
+    const creditUpdate = await supabase
+      .from("profiles")
+      .update({ credits: remaining })
+      .eq("id", user.id)
+      .select("credits")
+      .single();
 
-        if (!insertResult.error && insertResult.data) {
-          remaining = Math.max(0, DAILY_LIMIT - (insertResult.data.used_count ?? 0));
-        } else {
-          console.error("Failed to increment usage after generation (insert):", insertResult.error);
-        }
-      } else {
-        const updateResult = await supabase
-          .from("daily_usage")
-          .update({ used_count: (usageRow.used_count ?? 0) + 1 })
-          .eq("id", usageRow.id)
-          .select("used_count")
-          .single();
-
-        if (!updateResult.error && updateResult.data) {
-          remaining = Math.max(0, DAILY_LIMIT - (updateResult.data.used_count ?? 0));
-        } else {
-          console.error("Failed to increment usage after generation (update):", updateResult.error);
-        }
-      }
+    if (!creditUpdate.error && creditUpdate.data) {
+      remaining = Math.max(0, creditUpdate.data.credits ?? remaining);
+    } else {
+      console.error("Failed to decrement credits after generation:", creditUpdate.error);
     }
 
     return NextResponse.json({ result, remaining, historySaved });
