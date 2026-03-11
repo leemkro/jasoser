@@ -4,13 +4,14 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
 
+import { StripeCheckoutButton } from "@/components/stripe-checkout-button";
 import { useUser } from "@/hooks/use-user";
 import { TossBillingButton } from "@/components/toss-billing-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 
-const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ?? "";
+const tossClientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ?? "";
 
 const freePlan = {
   name: "무료",
@@ -120,7 +121,11 @@ export default function PricingPage() {
                 구독 취소하기
               </Button>
             ) : user ? (
-              <TossBillingButton clientKey={clientKey} userId={user.id} />
+              tossClientKey.trim().length > 0 ? (
+                <TossBillingButton clientKey={tossClientKey} userId={user.id} />
+              ) : (
+                <StripeCheckoutButton />
+              )
             ) : (
               <Button className="h-12 w-full text-base" size="lg" onClick={() => { window.location.href = "/"; }}>
                 로그인 후 구독하기
