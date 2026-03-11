@@ -8,8 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export default function BillingFailPage() {
   const searchParams = useSearchParams();
-  const code = searchParams.get("code");
-  const message = searchParams.get("message");
+  const code = searchParams.get("error_code") ?? searchParams.get("code");
+  const message = searchParams.get("error_msg") ?? searchParams.get("message");
 
   return (
     <div className="mx-auto max-w-md">

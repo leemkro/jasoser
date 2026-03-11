@@ -6,7 +6,7 @@ Operational guide for coding agents working in `C:\toyworkspace\jasoser`.
 
 - **Stack**: Next.js 15 App Router + React 19 + TypeScript + Tailwind CSS v4 (via `@tailwindcss/postcss`).
 - **Data/Auth**: Supabase (`@supabase/ssr`, `@supabase/supabase-js`). Google OAuth + email/password.
-- **Payments**: Stripe (`stripe`, `@stripe/stripe-js`) **and** Toss Payments (`@tosspayments/tosspayments-sdk`).
+- **Payments**: Stripe (`stripe`, `@stripe/stripe-js`) **and** PortOne (`https://cdn.iamport.kr/v1/iamport.js` + server verification API).
 - **AI generation**: OpenAI API (server-side `fetch` to `https://api.openai.com/v1/chat/completions`). See `lib/openai.ts`.
 - **Forms**: `react-hook-form` + `@hookform/resolvers` + `zod`.
 - **Data fetching**: Server components use Supabase directly; client components use `swr` or `fetch`.
@@ -56,10 +56,11 @@ All env access goes through `lib/env.ts` (lazy getters with `required()` guard).
 - `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_ANON_KEY`
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
-- `NEXT_PUBLIC_TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`
+- `NEXT_PUBLIC_PORTONE_STORE_ID`, `PORTONE_API_KEY`, `PORTONE_API_SECRET`
 
 **Optional**:
 - `NEXT_PUBLIC_APP_URL` (defaults to request origin)
+- `NEXT_PUBLIC_PORTONE_PG_PROVIDER` (PortOne 결제 PG사 식별자)
 - `SUPABASE_SERVICE_ROLE_KEY` (admin operations, webhooks)
 
 **Required for AI generation**
@@ -70,7 +71,7 @@ All env access goes through `lib/env.ts` (lazy getters with `required()` guard).
 
 ```
 app/                      # Next.js App Router
-  api/                    # API routes (generate, stripe, toss, webhooks)
+  api/                    # API routes (generate, stripe, portone, webhooks)
   auth/callback/          # Supabase auth callback
   (billing|create|dashboard|pricing|success)/  # Page routes (pricing UI temporarily disabled)
   layout.tsx              # Root layout (server component, Korean locale)
@@ -82,7 +83,7 @@ lib/                      # Shared utilities
   env.ts                  # Centralized env access (ALWAYS use this)
   openai.ts               # AI generation (OpenAI API)
   stripe.ts               # Stripe client singleton
-  toss.ts                 # Toss Payments API helpers
+  portone.ts              # PortOne API helpers
   types.ts                # Shared domain types
   utils.ts                # cn() utility
   supabase/               # Supabase clients (server, browser, admin, middleware)
@@ -162,7 +163,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 ## 15) Security and Boundaries
 
 - Never expose secret keys to client code.
-- AI calls, Stripe/Toss secret operations → server-side only.
+- AI calls, Stripe/PortOne secret operations → server-side only.
 - Middleware is routing guard, not sole authorization (always verify `auth.getUser()` in API routes). Authenticated users on `/` are redirected to `/create`.
 - Supabase admin client → server-only paths.
 - RLS enabled on all tables (see `supabase/schema.sql`).

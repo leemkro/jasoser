@@ -15,10 +15,17 @@ export default function BillingSuccessPage() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    const authKey = searchParams.get("authKey");
-    const customerKey = searchParams.get("customerKey");
+    const impUid = searchParams.get("imp_uid") ?? searchParams.get("impUid");
+    const merchantUid = searchParams.get("merchant_uid") ?? searchParams.get("merchantUid");
+    const impSuccess = searchParams.get("imp_success");
 
-    if (!authKey || !customerKey) {
+    if (impSuccess === "false") {
+      setStatus("error");
+      setErrorMessage(searchParams.get("error_msg") ?? "결제 승인에 실패했습니다.");
+      return;
+    }
+
+    if (!impUid || !merchantUid) {
       setStatus("error");
       setErrorMessage("결제 인증 정보가 없습니다.");
       return;
@@ -26,10 +33,10 @@ export default function BillingSuccessPage() {
 
     async function confirm() {
       try {
-        const response = await fetch("/api/toss/billing-key", {
+        const response = await fetch("/api/portone/confirm", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ authKey, customerKey }),
+          body: JSON.stringify({ impUid, merchantUid }),
         });
 
         const payload = await response.json();

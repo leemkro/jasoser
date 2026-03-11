@@ -20,6 +20,10 @@ export const env = {
   stripeSecretKey: () => required("STRIPE_SECRET_KEY", process.env.STRIPE_SECRET_KEY),
   stripeWebhookSecret: () =>
     required("STRIPE_WEBHOOK_SECRET", process.env.STRIPE_WEBHOOK_SECRET),
+  portoneStoreId: () =>
+    required("NEXT_PUBLIC_PORTONE_STORE_ID", process.env.NEXT_PUBLIC_PORTONE_STORE_ID),
+  portoneApiKey: () => required("PORTONE_API_KEY", process.env.PORTONE_API_KEY),
+  portoneApiSecret: () => required("PORTONE_API_SECRET", process.env.PORTONE_API_SECRET),
   tossClientKey: () => required("NEXT_PUBLIC_TOSS_CLIENT_KEY", process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY),
   tossSecretKey: () => required("TOSS_SECRET_KEY", process.env.TOSS_SECRET_KEY),
   appUrl: () => process.env.NEXT_PUBLIC_APP_URL,

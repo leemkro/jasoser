@@ -4,14 +4,15 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
 
+import { PortoneBillingButton } from "@/components/portone-billing-button";
 import { StripeCheckoutButton } from "@/components/stripe-checkout-button";
-import { useUser } from "@/hooks/use-user";
-import { TossBillingButton } from "@/components/toss-billing-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { useUser } from "@/hooks/use-user";
 
-const tossClientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ?? "";
+const portoneStoreId = process.env.NEXT_PUBLIC_PORTONE_STORE_ID ?? "";
+const portonePgProvider = process.env.NEXT_PUBLIC_PORTONE_PG_PROVIDER ?? "";
 
 const freePlan = {
   name: "무료",
@@ -37,7 +38,7 @@ export default function PricingPage() {
   async function cancelSubscription() {
     setCanceling(true);
     try {
-      const response = await fetch("/api/toss/cancel", { method: "POST" });
+      const response = await fetch("/api/portone/cancel", { method: "POST" });
       const payload = await response.json();
 
       if (!response.ok || !payload.success) {
@@ -121,8 +122,13 @@ export default function PricingPage() {
                 구독 취소하기
               </Button>
             ) : user ? (
-              tossClientKey.trim().length > 0 ? (
-                <TossBillingButton clientKey={tossClientKey} userId={user.id} />
+              portoneStoreId.trim().length > 0 ? (
+                <PortoneBillingButton
+                  storeId={portoneStoreId}
+                  pgProvider={portonePgProvider || undefined}
+                  userId={user.id}
+                  userEmail={user.email ?? undefined}
+                />
               ) : (
                 <StripeCheckoutButton />
               )
