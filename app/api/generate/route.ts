@@ -4,6 +4,7 @@ import { z } from "zod";
 import { generateEssay } from "@/lib/openai";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getFreeTrialRemaining, getTotalRemainingUsage } from "@/lib/usage";
 
 export const runtime = "nodejs";
 
@@ -44,20 +45,34 @@ export async function POST(request: Request) {
 
     const body = requestSchema.parse(await request.json());
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("credits")
-      .eq("id", user.id)
-      .maybeSingle();
+    const [{ data: profile, error: profileError }, generationCountResult] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("credits")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("generations")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id),
+    ]);
 
     if (profileError) {
       return NextResponse.json({ error: "이용권 정보를 불러오지 못했습니다." }, { status: 500 });
     }
 
+    if (generationCountResult.error) {
+      return NextResponse.json({ error: "사용 이력을 불러오지 못했습니다." }, { status: 500 });
+    }
+
     const currentCredits = Math.max(0, profile?.credits ?? 0);
-    if (currentCredits <= 0) {
+    const currentGenerationCount = Math.max(0, generationCountResult.count ?? 0);
+    const freeTrialRemaining = getFreeTrialRemaining(currentGenerationCount);
+    const currentRemaining = getTotalRemainingUsage(currentCredits, currentGenerationCount);
+
+    if (currentRemaining <= 0) {
       return NextResponse.json(
-        { error: "이용권이 부족합니다. 이용권 충전 후 다시 시도해 주세요." },
+        { error: "무료 체험과 이용권을 모두 사용했습니다. 이용권 충전 후 다시 시도해 주세요." },
         { status: 429 },
       );
     }
@@ -95,18 +110,26 @@ export async function POST(request: Request) {
       }
     }
 
-    let remaining = Math.max(0, currentCredits - 1);
-    const creditUpdate = await supabase
-      .from("profiles")
-      .update({ credits: remaining })
-      .eq("id", user.id)
-      .select("credits")
-      .single();
+    const nextGenerationCount = currentGenerationCount + 1;
+    let remaining = getTotalRemainingUsage(currentCredits, nextGenerationCount);
 
-    if (!creditUpdate.error && creditUpdate.data) {
-      remaining = Math.max(0, creditUpdate.data.credits ?? remaining);
-    } else {
-      console.error("Failed to decrement credits after generation:", creditUpdate.error);
+    if (freeTrialRemaining <= 0) {
+      const nextCredits = Math.max(0, currentCredits - 1);
+      const usageUpdate = await supabase
+        .from("profiles")
+        .upsert({
+          id: user.id,
+          email: user.email,
+          credits: nextCredits,
+        })
+        .select("credits")
+        .single();
+
+      if (!usageUpdate.error && usageUpdate.data) {
+        remaining = getTotalRemainingUsage(usageUpdate.data.credits ?? nextCredits, nextGenerationCount);
+      } else {
+        console.error("Failed to decrement credits after generation:", usageUpdate.error);
+      }
     }
 
     return NextResponse.json({ result, remaining, historySaved });

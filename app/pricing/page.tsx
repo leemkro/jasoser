@@ -13,7 +13,7 @@ const portoneStoreId = process.env.NEXT_PUBLIC_PORTONE_STORE_ID ?? "";
 const portonePgProvider = process.env.NEXT_PUBLIC_PORTONE_PG_PROVIDER ?? "";
 
 export default function PricingPage() {
-  const { user, loading, credits } = useUser();
+  const { user, loading, credits, freeTrialRemaining, totalRemaining } = useUser();
 
   if (loading) {
     return (
@@ -28,7 +28,11 @@ export default function PricingPage() {
       <div className="text-center">
         <h1 className="text-3xl font-bold text-zinc-900">이용권 충전</h1>
         <p className="mt-2 text-zinc-500">필요한 횟수만큼 이용권을 구매해 사용하세요.</p>
-        {user ? <p className="mt-1 text-sm text-zinc-600">현재 남은 이용권: {credits}회</p> : null}
+        {user ? (
+          <p className="mt-1 text-sm text-zinc-600">
+            현재 남은 생성 가능 횟수: {totalRemaining}회 (무료체험 {freeTrialRemaining}회 + 이용권 {credits}회)
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">

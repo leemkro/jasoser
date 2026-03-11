@@ -111,7 +111,7 @@ export default function CreatePage() {
     const remainingCount = await usage.getRemainingCount();
 
     if (remainingCount <= 0) {
-      toast.error("이용권이 부족합니다. 이용권 충전 후 다시 시도해 주세요.");
+      toast.error("무료 체험과 이용권을 모두 사용했습니다. 이용권 충전 후 다시 시도해 주세요.");
       setSubmitting(false);
       return;
     }
@@ -163,7 +163,7 @@ export default function CreatePage() {
 
   async function regenerateNatural() {
     if (remaining !== null && remaining <= 0) {
-      toast.error("이용권이 부족합니다. 이용권 충전 후 다시 시도해 주세요.");
+      toast.error("무료 체험과 이용권을 모두 사용했습니다. 이용권 충전 후 다시 시도해 주세요.");
       return;
     }
 
@@ -172,7 +172,7 @@ export default function CreatePage() {
 
     if (remainingCount <= 0) {
       usage.syncLocalFromRemaining(remainingCount);
-      toast.error("이용권이 부족합니다. 이용권 충전 후 다시 시도해 주세요.");
+      toast.error("무료 체험과 이용권을 모두 사용했습니다. 이용권 충전 후 다시 시도해 주세요.");
       return;
     }
 
@@ -322,7 +322,7 @@ export default function CreatePage() {
           </div>
 
           {remaining !== null ? (
-            <p className="text-sm text-zinc-500">남은 이용권: {remaining}회</p>
+            <p className="text-sm text-zinc-500">남은 생성 가능 횟수(무료체험 포함): {remaining}회</p>
           ) : null}
 
           {submitting ? (

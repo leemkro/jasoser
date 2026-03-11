@@ -3,11 +3,43 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { FREE_TRIAL_LIMIT, getTotalRemainingUsage } from "@/lib/usage";
 
-const DEFAULT_CREDITS = 0;
+const DEFAULT_REMAINING = FREE_TRIAL_LIMIT;
 
-function getLocalCreditsKey(userId: string) {
+function getLocalRemainingKey(userId: string) {
+  return `jasoseovibe:remaining:${userId}`;
+}
+
+function getLegacyLocalCreditsKey(userId: string) {
   return `jasoseovibe:credits:${userId}`;
+}
+
+function toNonNegative(value: string | null) {
+  if (value === null) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+
+  return Math.max(0, parsed);
+}
+
+function readLocalRemaining(userId: string) {
+  const nextRaw = toNonNegative(localStorage.getItem(getLocalRemainingKey(userId)));
+  if (nextRaw !== null) {
+    return nextRaw;
+  }
+
+  const legacyRaw = toNonNegative(localStorage.getItem(getLegacyLocalCreditsKey(userId)));
+  if (legacyRaw !== null) {
+    return legacyRaw;
+  }
+
+  return DEFAULT_REMAINING;
 }
 
 export function useSupabase(userId?: string | null) {
@@ -16,23 +48,30 @@ export function useSupabase(userId?: string | null) {
 
   const getRemainingCount = useCallback(async () => {
     if (!userId) {
-      return DEFAULT_CREDITS;
+      return 0;
     }
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("credits")
-        .eq("id", userId)
-        .maybeSingle();
+      const [{ data, error }, generationCountResult] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("credits")
+          .eq("id", userId)
+          .maybeSingle(),
+        supabase
+          .from("generations")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", userId),
+      ]);
 
-      if (error) {
-        const localRaw = localStorage.getItem(getLocalCreditsKey(userId));
-        return Math.max(0, localRaw ? Number(localRaw) : DEFAULT_CREDITS);
+      if (error || generationCountResult.error) {
+        return readLocalRemaining(userId);
       }
 
-      return Math.max(0, data?.credits ?? DEFAULT_CREDITS);
+      const remaining = getTotalRemainingUsage(data?.credits ?? 0, generationCountResult.count ?? 0);
+      localStorage.setItem(getLocalRemainingKey(userId), String(remaining));
+      return remaining;
     } finally {
       setLoading(false);
     }
@@ -43,8 +82,8 @@ export function useSupabase(userId?: string | null) {
       return;
     }
 
-    const key = getLocalCreditsKey(userId);
-    const current = Number(localStorage.getItem(key) ?? String(DEFAULT_CREDITS));
+    const key = getLocalRemainingKey(userId);
+    const current = readLocalRemaining(userId);
     localStorage.setItem(key, String(Math.max(0, current - 1)));
   }, [userId]);
 
@@ -54,18 +93,17 @@ export function useSupabase(userId?: string | null) {
         return;
       }
 
-      localStorage.setItem(getLocalCreditsKey(userId), String(Math.max(0, remaining)));
+      localStorage.setItem(getLocalRemainingKey(userId), String(Math.max(0, remaining)));
     },
     [userId],
   );
 
   const getLocalRemainingCount = useCallback(() => {
     if (!userId) {
-      return DEFAULT_CREDITS;
+      return 0;
     }
 
-    const localRaw = localStorage.getItem(getLocalCreditsKey(userId));
-    return Math.max(0, localRaw ? Number(localRaw) : DEFAULT_CREDITS);
+    return readLocalRemaining(userId);
   }, [userId]);
 
   return useMemo(

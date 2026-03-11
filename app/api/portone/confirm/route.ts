@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { CREDIT_PACKAGES, getPortOnePayment } from "@/lib/portone";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getTotalRemainingUsage } from "@/lib/usage";
 
 export const runtime = "nodejs";
 
@@ -54,16 +55,24 @@ export async function POST(request: Request) {
 
     if (purchaseInsert.error) {
       if (purchaseInsert.error.code === "23505") {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("credits")
-          .eq("id", user.id)
-          .maybeSingle();
+        const [{ data: profile }, generationCountResult] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("credits")
+            .eq("id", user.id)
+            .maybeSingle(),
+          supabase
+            .from("generations")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", user.id),
+        ]);
+        const remainingTotal = getTotalRemainingUsage(profile?.credits ?? 0, generationCountResult.count ?? 0);
 
         return NextResponse.json({
           success: true,
           creditsAdded: 0,
-          remainingCredits: profile?.credits ?? 0,
+          remainingCredits: remainingTotal,
+          remainingTotal,
           alreadyProcessed: true,
         });
       }
@@ -71,17 +80,24 @@ export async function POST(request: Request) {
       throw new Error(purchaseInsert.error.message);
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("credits")
-      .eq("id", user.id)
-      .maybeSingle();
+    const [{ data: profile, error: profileError }, generationCountResult] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("credits")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("generations")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id),
+    ]);
 
     if (profileError) {
       throw new Error(profileError.message);
     }
 
     const nextCredits = (profile?.credits ?? 0) + selectedPackage.credits;
+    const remainingTotal = getTotalRemainingUsage(nextCredits, generationCountResult.count ?? 0);
 
     const profileUpsert = await supabase.from("profiles").upsert({
       id: user.id,
@@ -98,7 +114,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       creditsAdded: selectedPackage.credits,
-      remainingCredits: nextCredits,
+      remainingCredits: remainingTotal,
+      remainingTotal,
       paidAt: payment.paidAt,
     });
   } catch (error) {

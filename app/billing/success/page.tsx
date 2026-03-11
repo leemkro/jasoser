@@ -14,7 +14,7 @@ export default function BillingSuccessPage() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [creditsAdded, setCreditsAdded] = useState(0);
-  const [remainingCredits, setRemainingCredits] = useState(0);
+  const [remainingCount, setRemainingCount] = useState(0);
 
   useEffect(() => {
     const impUid = searchParams.get("imp_uid") ?? searchParams.get("impUid");
@@ -46,6 +46,7 @@ export default function BillingSuccessPage() {
           error?: string;
           creditsAdded?: number;
           remainingCredits?: number;
+          remainingTotal?: number;
         };
 
         if (!response.ok || !payload.success) {
@@ -53,7 +54,7 @@ export default function BillingSuccessPage() {
         }
 
         setCreditsAdded(payload.creditsAdded ?? 0);
-        setRemainingCredits(payload.remainingCredits ?? 0);
+        setRemainingCount(payload.remainingTotal ?? payload.remainingCredits ?? 0);
         setStatus("success");
         toast.success("이용권 충전이 완료되었습니다!");
       } catch (error) {
@@ -106,8 +107,8 @@ export default function BillingSuccessPage() {
           <CardTitle>이용권 충전 완료</CardTitle>
           <CardDescription>
             {creditsAdded > 0
-              ? `${creditsAdded}회 이용권이 추가되었습니다. 현재 남은 이용권은 ${remainingCredits}회입니다.`
-              : `이미 반영된 결제입니다. 현재 남은 이용권은 ${remainingCredits}회입니다.`}
+              ? `${creditsAdded}회 이용권이 추가되었습니다. 현재 남은 생성 가능 횟수는 ${remainingCount}회입니다.`
+              : `이미 반영된 결제입니다. 현재 남은 생성 가능 횟수는 ${remainingCount}회입니다.`}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">

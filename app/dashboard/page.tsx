@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { GenerationRow } from "@/lib/types";
+import { getFreeTrialRemaining, getTotalRemainingUsage } from "@/lib/usage";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function DashboardPage() {
     redirect("/");
   }
 
-  const [profileResult, generationResult] = await Promise.all([
+  const [profileResult, generationResult, generationCountResult] = await Promise.all([
     supabase.from("profiles").select("credits").eq("id", user.id).single(),
     supabase
       .from("generations")
@@ -27,9 +28,16 @@ export default async function DashboardPage() {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(30),
+    supabase
+      .from("generations")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id),
   ]);
 
-  const credits = profileResult.data?.credits ?? 0;
+  const credits = Math.max(0, profileResult.data?.credits ?? 0);
+  const generationCount = Math.max(0, generationCountResult.count ?? 0);
+  const freeTrialRemaining = getFreeTrialRemaining(generationCount);
+  const totalRemaining = getTotalRemainingUsage(credits, generationCount);
   const history = (generationResult.data ?? []) as GenerationRow[];
 
   return (
@@ -37,11 +45,11 @@ export default async function DashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900">대시보드</h1>
-          <p className="text-sm text-zinc-600">생성 기록과 이용권 잔여 횟수를 확인하세요.</p>
+          <p className="text-sm text-zinc-600">생성 기록과 무료체험/이용권 잔여 횟수를 확인하세요.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant={credits > 0 ? "success" : "secondary"}>
-            남은 이용권 {credits}회
+          <Badge variant={totalRemaining > 0 ? "success" : "secondary"}>
+            남은 {totalRemaining}회 (무료 {freeTrialRemaining} + 이용권 {credits})
           </Badge>
           <Button asChild>
             <Link href="/create">새 자소서 만들기</Link>
